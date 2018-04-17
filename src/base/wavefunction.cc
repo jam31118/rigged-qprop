@@ -1781,6 +1781,33 @@ int wavefunction::dump_to_file_sh(grid g, FILE* os, int stepwidth, int iv)
 }
 
 
+int wavefunction::dump_to_file_binary(ofstream& os, int iv) {
+  if (!os.good()) {fprintf(stderr, "File state flag is not good. Unable to write.\n"); fflush(stderr); return 1;}
+  if (iv==1) {fprintf(stdout, "Saving to binary file\n"); fflush(stdout);}
+  os.write((char *) start, sizeof(cplxd) * wf_size());
+  return 0;
+}
+
+
+/* Save wavefunction in binary mode with ell-m index running fastest */
+int wavefunction::save_to_binary_file_in_chunck(grid g, ofstream& os, int iv)
+{
+  if (!os.good()) {fprintf(stderr, "File state flag is not good. Unable to write.\n"); fflush(stderr); return 1;}
+  long xindex, N_x = g.ngps_x();
+  cplxd *p_wf, *p_wf_max = start + wf_size();
+  int size_of_cplxd = sizeof(cplxd);
+
+  if (iv==1) {fprintf(stdout, "Saving to binary file with chuncking\n"); fflush(stdout);}
+  for (xindex=0; xindex<g.ngps_x(); xindex++) {
+    for (p_wf = start + xindex; p_wf < p_wf_max; p_wf += N_x) {
+      os.write((char *) p_wf, size_of_cplxd);
+    }
+  }
+  return 0;
+}
+
+
+
 wavefunction wavefunction::calculate_Theta(grid g, const fluid &degeneracies, const fluid &ms)
 {
   wavefunction result(g.ngps_x());

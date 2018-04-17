@@ -1,9 +1,9 @@
 optimargs=-O3 -ffast-math -march=native
 
-LIBHOME=../prereq/tool/install
-GSLHOME=$(LIBHOME)/gsl-2.4
-MPIHOME=$(LIBHOME)/openmpi-1.10.7
-BOOSTHOME=$(LIBHOME)/boost_1_65_1
+LIBHOME=/home/zietlow/tool/install/
+GSLHOME=$(LIBHOME)/gsl-2.4/
+MPIHOME=$(LIBHOME)/openmpi-1.10.7/
+BOOSTHOME=$(LIBHOME)/boost_1_65_1/
 
 gslargs=-I$(GSLHOME)/include -L$(GSLHOME)/lib -lgsl -lgslcblas
 mpiargs=-I$(MPIHOME)/include -L$(MPIHOME)/lib -lmpi -lmpi_cxx -DHAVE_MPI

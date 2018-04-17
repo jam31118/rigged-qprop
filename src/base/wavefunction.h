@@ -52,6 +52,8 @@ class wavefunction
     void dump_xvector_to_file(long ngpsx,  FILE* os, int stepwidth);
     void dump_to_file_sh(grid g, FILE* os, int stepwidth);
     int  dump_to_file_sh(grid g, FILE* os, int stepwidth, int iv);
+    int dump_to_file_binary(ofstream& os, int iv);
+    int save_to_binary_file_in_chunck(grid g, ofstream& os, int iv);
     void dump_expect_z(grid g, FILE* os, fluid &degeneracies, const fluid &ms);
 
 

@@ -1,0 +1,6 @@
+imag-width double 150.0
+ell-grid-size long 25
+max-electric-field double 0.0533799
+omega double 0.114
+num-cycles double 2.0
+delta-t double 0.05

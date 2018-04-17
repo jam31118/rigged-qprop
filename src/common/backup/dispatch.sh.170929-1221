@@ -1,0 +1,95 @@
+#!/bin/bash
+
+requiredTotalMemCalculator="../../../common/getTotalSizeOf_tsurff.sh"
+evalParamFile="./tsurff.param"
+evalParamFileCopy="./tsurffpsi.param.copy"
+
+eval_bin="./eval-tsurff-mpi"
+
+numOfProcess=4
+
+
+# Get parameter from parameter file
+num_theta_surff=$(grep -oP 'num-theta-surff long \K(.+)' $evalParamFile)
+
+# Memory threshold that a program (including all processes of MPI) shouldn't use beyond
+possibleMem=5000000 # ~ 5 MB
+
+# Total amount of memory the program will use (estimated minimum, possibly more)
+requiredTotalMem=$(bash $requiredTotalMemCalculator)
+
+#requiredNumOfCalc=$(echo "($requiredTotalMem + $possibleMem - 1) / $possibleMem" | bc -l)
+requiredNumOfCalc=$(( ($requiredTotalMem + $possibleMem - 1) / $possibleMem ))
+
+numThetaPerCalc=$(( ($num_theta_surff + $requiredNumOfCalc - 1) / $requiredNumOfCalc  ))
+
+echo numThetaPerCalc = $numThetaPerCalc
+echo num_theta_surff = $num_theta_surff
+echo requiredTotalMem = $requiredTotalMem
+echo requiredNumOfCalc = $requiredNumOfCalc
+
+
+temp_data_dir="temp_data"
+if [ ! -d "$temp_data_dir" ]; then mkdir $temp_data_dir; fi
+
+min_theta_index=0
+num_theta_partial=0
+curIndexOfCalc=0
+while [ "$curIndexOfCalc" -lt "$requiredNumOfCalc" ]
+do
+  #echo curIndexOfCalc = $curIndexOfCalc
+  min_theta_index=$(echo "$curIndexOfCalc * $numThetaPerCalc" | bc -l)
+  let num_theta_partial=$numThetaPerCalc
+  
+  let next_min_theta_index=($min_theta_index + $numThetaPerCalc)
+  if [ "$next_min_theta_index" -gt "$num_theta_surff" ];
+  then
+    num_theta_partial=$(echo "$num_theta_surff - $min_theta_index" | bc -l)
+  fi
+  echo min_theta_index = $min_theta_index
+  echo num_theta_partial = $num_theta_partial
+
+#  mv $evalParamFile $evalParamFileCopy
+
+  # Backup original parameter file
+  cp $evalParamFile $evalParamFileCopy  
+
+  # Modify parameter file(s)
+  cat $evalParamFile \
+    | sed "s/min-theta-index long .*/min-theta-index long $min_theta_index/g"  \
+    | sed "s/num-theta-partial long .*/num-theta-partial long $num_theta_partial/g" \
+    > $evalParamFile$curIndexOfCalc
+
+  mv $evalParamFile$curIndexOfCalc $evalParamFile
+  
+  mpirun -np $numOfProcess $eval_bin > eval.log.$curIndexOfCalc 2>&1
+  if [ "$?" -ne 0 ]; then echo "[ERROR] $eval_bin has exited with error code $?, terminating the program"; exit 1; fi
+  echo "[ LOG ] $eval_bin completed"
+  
+  temp_data_subdir="$temp_data_dir/$curIndexOfCalc"
+  if [ ! -d "$temp_data_subdir" ]; then mkdir $temp_data_subdir; fi
+  #mv ./tsurff-polar*.dat ./tsurff-partial*.dat "$temp_data_subdir" # no tsurff-partial file in expansion-scheme = 1
+  mv ./tsurff-polar*.dat "$temp_data_subdir"
+
+  # Actual concatenation happens here
+  suffix=".dat"
+  for prefix in tsurff-polar
+  do
+  result="$temp_data_subdir/$prefix$suffix"
+  echo -n "" > $result  # make the file empty
+  for ((id=0; id<$numOfProcess; id++)) {
+    obj="$temp_data_subdir/$prefix$id$suffix"
+    if [ -f $obj ]; 
+    then 
+      echo "[ LOG ] cat $obj >> $result"; 
+      cat $obj >> $result;
+    else echo "[ERROR] No file \"$obj\""; exit 1; fi
+  }
+  done
+
+
+  curIndexOfCalc=$(($curIndexOfCalc + 1))
+done
+
+
+

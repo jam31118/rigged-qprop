@@ -1,0 +1,11 @@
+# width of the region where imaginary potential is different from zero
+imag-width double 150.0
+# maximum number of ells in the expansion of the wave function used during time propagation
+ell-grid-size long 15
+# maximum value of the electric field of the laser pulse
+max-electric-field double 0.02387
+# frequency of the laser pulse
+omega double 0.085
+num-cycles double 20.0
+# time step for propagation; delta-r/4 is a sensible choice
+delta-t double 0.05

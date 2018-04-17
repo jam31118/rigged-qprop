@@ -1,0 +1,1146 @@
+#ifndef TSURFF_SPECTRUM_HH
+#define TSURFF_SPECTRUM_HH
+
+#include <memory>
+#include <vector>
+#include <complex>
+#include <grid.h>
+#include <rwBinaryFile.hh>
+#include <wavefunction.h>
+#include <gsl/gsl_sf_legendre.h>
+#include <gsl/gsl_sf_bessel.h>
+#include <gsl/gsl_sf_coupling.h>
+#include <parameter.hh>
+#ifdef HAVE_BOOST
+#include <boost/timer.hpp>
+#endif
+#include <smallHelpers.hh>
+#include <powers.hh>
+#include <ylm.h>
+
+#ifdef HAVE_MPI
+#include "mpi.h"
+#endif
+
+typedef std::complex<double> cplxd;
+typedef std::unique_ptr<cplxd[]> cplxd_ptr;
+typedef std::unique_ptr<double[]> double_ptr;
+
+inline cplxd pow_i(long l) {
+  if (l%4==0) return cplxd(1.0, 0.0);
+  if (l%4==1) return cplxd(0.0, 1.0);
+  if (l%4==2) return cplxd(-1.0, 0.0);
+  if (l%4==3) return cplxd(0.0, -1.0);
+  if (l%4==-0) return cplxd(1.0, 0.0);
+  if (l%4==-1) return cplxd(0.0, -1.0);
+  if (l%4==-2) return cplxd(-1.0, 0.0);
+  if (l%4==-3) return cplxd(0.0, 1.0);
+};
+
+inline cplxd pow_neg_i(long l) {
+  if (l%4==0) return cplxd(1.0, 0.0); //1
+  if (l%4==1) return cplxd(0.0, -1.0); //-i
+  if (l%4==2) return cplxd(-1.0, 0.0); //-1
+  if (l%4==3) return cplxd(0.0, 1.0); //i
+  if (l%4==-0) return cplxd(1.0, 0.0);
+  if (l%4==-1) return cplxd(0.0, 1.0);
+  if (l%4==-2) return cplxd(-1.0, 0.0);
+  if (l%4==-3) return cplxd(0.0, -1.0);
+};
+
+inline double pow_neg_1(long p) {
+  return (labs(p%2)==1)?-1.0:1.0;
+};
+
+inline double Ylm_prefactor(long m) {
+  if (m>=0)
+    return 1.0;
+  else if ((-m)%2==0)
+    return 1.0;
+  else
+    return -1.0;
+};
+
+using std::vector;
+using std::cerr;
+using std::cout;
+using std::endl;
+using std::ofstream;
+
+
+// This class saves the orbital and its derivatives at the t-SURFF boundary
+class tsurffSaveWF {
+  ofstream psi;
+  ofstream dpsi_dr;
+  long ind_R;
+  // (let ((mylist '(("double" "delta-r" "param_ini") ("double" "R-tsurff" "param_tsurff") ("long" "qprop-dim" "param_ini") ("long" "ell-grid-size" "param_prop") ))) (param-list-for-class mylist))
+  double delta_r;
+  double R_tsurff;
+  long ell_grid_size;
+  long qprop_dim;
+  grid the_grid;
+public:
+  tsurffSaveWF(const parameterListe &param_ini, const parameterListe &param_prop, const parameterListe &param_tsurff, grid prop_g, string filename="tsurff")
+    : psi( filename+string("psi.raw"), std::ios::binary ), dpsi_dr( filename+string("-dpsidr.raw"), std::ios::binary ) {
+    qprop_dim = param_ini.getLong("qprop-dim");
+    delta_r = param_ini.getDouble("delta-r");
+    R_tsurff = param_tsurff.getDouble("R-tsurff");
+    ell_grid_size = param_prop.getLong("ell-grid-size");
+    // the calculation of ind_R should be consistent with the rest of the program
+    ind_R=prop_g.rindex(R_tsurff);
+    // R_tsurff=prop_g.r(i_R);
+    the_grid=prop_g;
+  };
+  void operator()(const wavefunction &wf) {
+    const double one_over_12delta_r=1.0/(12.0*delta_r);
+    const double two_over_3delta_r=2.0/(3.0*delta_r);
+    if (qprop_dim==44) {
+      for (long i_ell=0; i_ell<ell_grid_size; i_ell++) {
+	for (long i_m=-i_ell; i_m<i_ell+1; i_m++) {
+	  const long ind_wave=the_grid.rlmindex(ind_R, i_ell, i_m);
+	  const long ind_wave_n=the_grid.rlmindex(ind_R+1, i_ell, i_m);
+	  const long ind_wave_p=the_grid.rlmindex(ind_R-1, i_ell, i_m);
+	  const long ind_wave_n2=the_grid.rlmindex(ind_R+2, i_ell, i_m);
+	  const long ind_wave_p2=the_grid.rlmindex(ind_R-2, i_ell, i_m);
+	  psi.write(reinterpret_cast<const char*>(&wf[ind_wave]), sizeof(cplxd));
+	  const cplxd deriv_wf = ((wf[ind_wave_n]-wf[ind_wave_p])*two_over_3delta_r-(wf[ind_wave_n2]-wf[ind_wave_p2])*one_over_12delta_r);
+	  dpsi_dr.write(reinterpret_cast<const char*>(&deriv_wf), sizeof(cplxd));
+	};
+      };
+    }
+    else if (qprop_dim==34) {
+      for (long i_ell=0; i_ell<ell_grid_size; i_ell++) {
+	const long ind_wave=the_grid.index(ind_R, i_ell, 0);
+	const long ind_wave_n=the_grid.index(ind_R+1, i_ell, 0);
+	const long ind_wave_p=the_grid.index(ind_R-1, i_ell, 0);
+	const long ind_wave_n2=the_grid.index(ind_R+2, i_ell, 0);
+	const long ind_wave_p2=the_grid.index(ind_R-2, i_ell, 0);
+	psi.write(reinterpret_cast<const char*>(&wf[ind_wave]), sizeof(cplxd));
+	const cplxd deriv_wf = ((wf[ind_wave_n]-wf[ind_wave_p])*two_over_3delta_r-(wf[ind_wave_n2]-wf[ind_wave_p2])*one_over_12delta_r);
+	dpsi_dr.write(reinterpret_cast<const char*>(&deriv_wf), sizeof(cplxd));
+      };
+    }
+    else {
+      cerr << "No such option implemented for qprop dim " << qprop_dim << " in class tsurffSaveWF" << endl; 
+    };
+  };
+};
+
+template<class vx, class vy, class vz>
+class tsurffSpectrum {
+  vx vecpot_x;
+  vy vecpot_y;
+  vz vecpot_z;
+
+  ifstream dpsi_dr;
+  ifstream psi;
+  
+  cplxd_ptr psi_surff;
+  cplxd_ptr psi_A_surff;
+  cplxd_ptr psi_A_cc_surff;
+  cplxd_ptr psi_deriv_surff;
+  cplxd_ptr psi_R;
+  cplxd_ptr psi_R_deriv;
+  double_ptr psi_buffer_R;
+  double_ptr psi_buffer_R_deriv;
+  cplxd_ptr partial_amplitude;
+  // space for the momentum grid
+  vector<double> thetas_surff;
+  vector<double> phis_surff;
+  vector<double> k_values;
+  // (let ((mylist '(("double" "delta-r" "param_ini") ("double" "delta-t" "param_prop") ("double" "R-tsurff" "param_tsurff") ("double" "k-max-surff" "param_tsurff") ("long" "num-k-surff" "param_tsurff") ("long" "num-theta-surff" "param_tsurff") ("long" "num-phi-surff" "param_tsurff") ("long" "delta-k-scheme" "param_tsurff") ("long" "cache-size-t" "param_tsurff") ("long" "expansion-scheme" "param_tsurff") ("long" "qprop-dim" "param_ini") ("long" "ell-grid-size" "param_prop") ("long" "initial-m" "param_ini")))) (param-list-for-class mylist))
+
+  long expansion_scheme;
+  double delta_r;
+  double delta_t;
+  double R_tsurff;
+  double k_max_surff;
+  long num_k_surff;
+  long num_theta_surff;
+  long num_phi_surff;
+  long delta_k_scheme;
+  long cache_size_t;
+  long qprop_dim;
+  long ell_grid_size;
+  long initial_m;
+
+  long ell_m_grid_size;
+  
+  double duration;
+
+  int i_proc;
+  int num_proc;
+  long  num_k_proc;
+public:
+  tsurffSpectrum(const parameterListe &param_ini, const parameterListe &param_prop, const parameterListe &param_tsurff, vx vecpotx, vy vecpoty, vz vecpotz, string filename="tsurff")
+    : thetas_surff(101, 0.0), phis_surff(101, 0.0), k_values(100, 0.0), psi(filename+string("psi.raw"), std::ios::binary), dpsi_dr(filename+string("-dpsidr.raw"), std::ios::binary), vecpot_x(vecpotx), vecpot_y(vecpoty), vecpot_z(vecpotz) {
+    expansion_scheme = param_tsurff.getLong("expansion-scheme");
+    delta_r = param_ini.getDouble("delta-r");
+    delta_t = param_prop.getDouble("delta-t");
+    R_tsurff = param_tsurff.getDouble("R-tsurff");
+    k_max_surff = param_tsurff.getDouble("k-max-surff");
+    num_k_surff = param_tsurff.getLong("num-k-surff");
+    num_theta_surff = param_tsurff.getLong("num-theta-surff");
+    num_phi_surff = param_tsurff.getLong("num-phi-surff");
+    delta_k_scheme = param_tsurff.getLong("delta-k-scheme");
+    cache_size_t = param_tsurff.getLong("cache-size-t");
+    qprop_dim = param_ini.getLong("qprop-dim");
+    ell_grid_size = param_prop.getLong("ell-grid-size");
+    initial_m = param_ini.getLong("initial-m");
+
+    // size of grid for ells and ms: ell^2 for dim 44 and ell for 34
+    ell_m_grid_size=(qprop_dim==34)?ell_grid_size:ell_grid_size*ell_grid_size;
+    
+    // the calculation of ind_R should be consistent with the rest of the program
+    grid prop_g(qprop_dim, 0, delta_r, 0.0); // this grid instance is only used to calculate an r-index and r from index
+    const long ind_R=prop_g.rindex(R_tsurff);
+    // Caution: value from parameter file is overwritten by value on grid point
+    R_tsurff=prop_g.r(ind_R);
+
+    // This might be a bug waiting to happen!!
+    const double pulse_duration=(qprop_dim==34)?vecpot_z.get_duration():vecpot_x.get_duration();
+    
+    // how long do the slowest electrons have time to reach the t-SURFF boundary
+    const double time_surff=param_tsurff.getDouble("R-tsurff")/param_tsurff.getDouble("p-min-tsurff");
+    duration=pulse_duration+time_surff;
+
+    i_proc=0;
+    num_proc=1;
+    num_k_proc=num_k_surff;
+#ifdef HAVE_MPI
+    MPI_Comm_rank(MPI_COMM_WORLD, &i_proc);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
+    num_k_proc=num_k_surff/num_proc;
+    // last proc has to work more sometimes..
+    if (i_proc==(num_proc-1))
+      num_k_proc+=num_k_surff%num_proc;
+    cout << " I am process " << i_proc << " of " << num_proc << " processes. My share of k values: " << num_k_proc << endl;
+#endif
+    
+    prep_mom_grid();
+    prep_space();
+  };
+  
+  void time_integration() {
+    long entries_read(0);
+    long all_entries_read(0);
+    long offset(0);
+    long start_t(0);
+    do {
+#ifdef HAVE_BOOST
+      boost::timer tim;
+#endif
+      // ell_m_grid_size * cache_size_t entries are read
+      entries_read=read_psi_data()/ell_m_grid_size;
+      if (expansion_scheme==1 && qprop_dim==34)
+	time_integration_theta_phi(start_t, start_t+entries_read);
+      else if (expansion_scheme==2 && qprop_dim==34) {
+	time_integration_ell1_ell2(start_t, start_t+entries_read);
+      }
+      else if (expansion_scheme==2 && qprop_dim==44) {
+	time_integration_ell1_m1_ell2_m2(start_t, start_t+entries_read);
+      }
+      else if (expansion_scheme==1 && qprop_dim==44) {
+	time_integration_theta_phi_ell_m(start_t, start_t+entries_read);
+      }
+      else {
+	cerr << "combination of expansion scheme " << expansion_scheme << " and qprop dimension " << qprop_dim << " is not implemented." << endl;
+	exit(-1);
+      };
+      start_t+=entries_read;
+      all_entries_read+=entries_read;
+      if (i_proc==0)
+	cout << "timestep " << all_entries_read << " of " << long(duration/delta_t)+1 << endl;
+      offset+=cache_size_t;
+#ifdef HAVE_BOOST
+      cout << "time for call of time_integration() per time step:  " << tim.elapsed()/double(entries_read) << " for proc " << i_proc << endl;
+#endif
+    } while (entries_read==cache_size_t);
+  };
+  
+  void polar_spectrum() {
+    if (expansion_scheme==1 && qprop_dim==34) {
+      eval_spectrum_34_theta_phi();
+    }
+    else if (expansion_scheme==1 && qprop_dim==44) {
+      eval_spectrum_44_theta_phi();
+    }
+    else if (expansion_scheme==2 && qprop_dim==34) {
+      eval_partial_spectra_34_ell1_ell2();
+      eval_spectrum_34_ell1_ell2();
+    }
+    else if (expansion_scheme==2 && qprop_dim==44) {
+      eval_partial_spectra_44_ell1_ell2();
+      eval_spectrum_44_ell1_ell2();
+    }
+    else {
+      cerr << "expansion scheme " << expansion_scheme << " not implemented" << endl;
+      exit(-1);
+    };
+  };
+
+  // functions for debugging purposes
+  int test_index_ell1_m1_ell2() {
+    long counter;
+    for (long i_ell2=0; i_ell2<ell_grid_size; i_ell2++) {
+      for (long i_ell1=0; i_ell1<ell_grid_size; i_ell1++) {
+	for (long i_m1=-(i_ell1); i_m1<(i_ell1+1); i_m1++) {
+	  if (counter!=index_ell1_m1_ell2(i_ell1, i_m1, i_ell2))
+	    return counter;
+	  counter++;
+	};
+      };
+    };
+    return 0;
+  };
+  
+  void print_Plms() {
+    if (i_proc==0) {
+      ofstream debug_Plm_dat("debug-Plm.dat");
+      long num_Plm_one_theta=gsl_sf_legendre_array_size(ell_grid_size, initial_m);
+      debug_Plm_dat << num_Plm_one_theta << " num_Plm_one_theta" << endl;
+      double Plm_theta[num_Plm_one_theta*num_theta_surff];
+      for (long i_theta=0; i_theta<num_theta_surff; i_theta++) {
+	const double cos_theta=cos(thetas_surff[i_theta]);
+	const double theta=(thetas_surff[i_theta]);
+	// gsl_sf_legendre_sphPlm_array(ell_grid_size, initial_m, cos_theta, &(Plm_theta[i_theta*num_Plm_one_theta]));
+	for (long i_ell=labs(initial_m); i_ell<ell_grid_size-1; i_ell++) {
+	  // const long ind_Plm=i_ell-labs(initial_m)+num_Plm_one_theta*i_theta;
+	  const double gsl_Plm = gsl_sf_legendre_sphPlm(i_ell, labs(initial_m), cos_theta);
+	  const cplxd dieter_Plm = ylm2(i_ell, initial_m, theta, 0.0);
+	  debug_Plm_dat << i_theta << " " << i_ell << " " << gsl_Plm << " " << dieter_Plm << endl;
+	};
+	debug_Plm_dat << endl;
+      };
+    };
+  };
+  
+  void print_bessel() {
+    if (i_proc==0) {
+      ofstream debug_bessel_dat("debug-bessel.dat");
+      double j_l2kalpha[ell_grid_size];
+      double j_l2kalpha_neg[ell_grid_size];
+      for (long i_k=0; i_k<num_k_surff; i_k++) {
+	const double k=k_values[i_k];
+	fill_bessel_array(k, 1.0, j_l2kalpha);
+	fill_bessel_array(k, -1.0, j_l2kalpha_neg);
+	for (long i_ell_2=0; i_ell_2<ell_grid_size; i_ell_2++) {
+	  debug_bessel_dat << i_ell_2 << " " << k << " " << j_l2kalpha[i_ell_2] << " " << j_l2kalpha_neg[i_ell_2] << endl;
+	};
+	debug_bessel_dat << endl;
+      };
+    };
+  };
+  
+  void print_int_dt_psi(long i_theta=0) {
+    if (expansion_scheme==1) {
+      ofstream tsurff_input_dat("tsurff-int_dt_psi-"+to_string(i_proc)+".dat");
+      const double cos_theta=cos(thetas_surff[i_theta]);
+      for (long i_k=0; i_k<num_k_proc; i_k++) {
+	const double k=k_values[i_k];
+	for (long i_ell=0; i_ell<ell_grid_size; i_ell++) {
+	  const long ind_surff=index_ell_theta_k(i_ell, i_theta, i_k);
+	  tsurff_input_dat << i_ell << " " << k << " " << real(psi_surff[ind_surff]) << " " << imag(psi_surff[ind_surff]) << " "
+			   << real(psi_deriv_surff[ind_surff]) << " " << imag(psi_deriv_surff[ind_surff]) << " "
+			   << real(psi_A_surff[ind_surff]) << " " << imag(psi_A_surff[ind_surff]) << endl;
+	};
+	tsurff_input_dat << endl;
+      };
+    }
+    else if (expansion_scheme==2 && qprop_dim==34) {
+      ofstream tsurff_input_dat("tsurff-int_dt_psi"+to_string(i_proc)+".dat");
+      for (long i_ell2=0; i_ell2<ell_grid_size; i_ell2++) {
+	tsurff_input_dat << "# ell_2=" << i_ell2 << endl;
+	for (long i_k=0; i_k<num_k_proc; i_k++) {
+	  const double k=k_values[i_k];
+	  for (long i_ell1=0; i_ell1<ell_grid_size; i_ell1++) {
+	    const long ind_surff=index_ell1_ell2_k(i_ell1, i_ell2, i_k);
+	    tsurff_input_dat << i_ell1 << " " << k << " " << real(psi_surff[ind_surff]) << " " << imag(psi_surff[ind_surff]) << " "
+			     << real(psi_deriv_surff[ind_surff]) << " " << imag(psi_deriv_surff[ind_surff]) << " "
+			     << real(psi_A_surff[ind_surff]) << " " << imag(psi_A_surff[ind_surff]) << endl;
+	  };
+	tsurff_input_dat << endl;
+	};
+      tsurff_input_dat << endl;
+      };
+    }
+    else if (expansion_scheme==2 && qprop_dim==44) {
+      ofstream tsurff_input_dat("tsurff-int_dt_psi"+to_string(i_proc)+".dat");
+      for (long i_ell2=0; i_ell2<ell_grid_size; i_ell2++) {
+	for (long i_m2=-(i_ell2); i_m2<(i_ell2+1); i_m2++) {
+	  tsurff_input_dat << "# ell_2=" << i_ell2 << " m_2=" << i_m2 << endl;
+	  for (long i_k=0; i_k<num_k_proc; i_k++) {
+	    const double k=k_values[i_k];
+	    for (long i_ell1=0; i_ell1<ell_grid_size; i_ell1++) {
+	      tsurff_input_dat << i_ell1 << " " << k << " ";
+	      for (long i_m1=-(i_ell2); i_m1<(i_ell2+1); i_m1++) {
+		const long ind_surff=index_ell1_m1_ell2_m2_k(i_ell1, i_m1, i_ell2, i_m2, i_k);
+		tsurff_input_dat << i_m1 << " " << real(psi_surff[ind_surff]) << " " << imag(psi_surff[ind_surff]) << " "
+				 << real(psi_deriv_surff[ind_surff]) << " " << imag(psi_deriv_surff[ind_surff]) << " "
+				 << real(psi_A_surff[ind_surff]) << " " << imag(psi_A_surff[ind_surff]) << " ";
+	      };
+	      tsurff_input_dat << endl;
+	    };
+	    tsurff_input_dat << endl;
+	  };
+	  tsurff_input_dat << endl;
+	};
+      };
+    };
+  };
+
+  void print_wigner() {
+    if (i_proc==0) {
+      ofstream debug_wigner_dat("debug-wigner.dat");
+      if (qprop_dim==34) {
+	double_ptr wigner_pre(new double[ell_grid_size*ell_grid_size]);
+	for (long i_ell=0; i_ell<ell_grid_size; i_ell++) {
+	  debug_wigner_dat << "# ell=" << i_ell << endl;
+	  fill_wigner_prefactors(i_ell, initial_m, wigner_pre);
+	  for (long i_ell2=0; i_ell2<ell_grid_size; i_ell2++) {
+	    for (long i_ell1=0; i_ell1<ell_grid_size; i_ell1++) {
+	      debug_wigner_dat << i_ell2 << " " <<  i_ell1 << " " << wigner_pre[index_ell1_ell2(i_ell1, i_ell2)] << endl;
+	    };
+	    debug_wigner_dat << endl;
+	  };
+	  debug_wigner_dat << endl;
+	};
+      };
+    };
+  };
+  
+  void print_partial_amplitudes() {
+    if (expansion_scheme==2) {
+      ofstream debug_dat("tsurff-partial"+to_string(i_proc)+".dat");
+      if (qprop_dim==34 && expansion_scheme==2) {
+	for (long i_k=0; i_k<num_k_proc; i_k++) {
+	  double total_spectrum_k(0.0);
+	  const double k=k_values[i_k];
+	  debug_dat << k*k*0.5 << " " << k;
+	  for (long i_ell=0; i_ell<ell_grid_size; i_ell++) {
+	    const long ind_ampl=index_ell_k(i_ell, i_k);
+	    // debug_dat << " " << real(partial_amplitude[index_ell_k(i_ell, i_k)]) << " " << imag(partial_amplitude[index_ell_k(i_ell, i_k)]);
+	    const double norm_a_ell_k=norm(partial_amplitude[ind_ampl]);
+	    total_spectrum_k+=norm_a_ell_k;
+	    debug_dat << " " << norm_a_ell_k*k;
+	  };
+	  debug_dat << " " << total_spectrum_k*k << endl;
+	};
+      }
+      else if (qprop_dim==44 && expansion_scheme==2) {
+	for (long i_k=0; i_k<num_k_proc; i_k++) {
+	  double total_spectrum_k(0.0);
+	  const double k=k_values[i_k];
+	  debug_dat << k*k*0.5 << " " << k;
+	  for (long i_ell=0; i_ell<ell_grid_size; i_ell++) {
+	    for (long i_m=-(i_ell); i_m<(i_ell+1); i_m++) {
+	      const long ind_ampl=index_ell_m_k(i_ell, i_m, i_k);
+	      // debug_dat << " " << real(partial_amplitude[ind_ampl]) << " " << imag(partial_amplitude[ind_ampl]);
+	      const double norm_a_ell_m_k=norm(partial_amplitude[ind_ampl]);
+	      total_spectrum_k+=norm_a_ell_m_k;
+	      debug_dat << " " << norm_a_ell_m_k*k;
+	    };
+	  };
+	  debug_dat << " " << total_spectrum_k*k << endl;
+	};
+      };
+    };
+  };
+  
+private:
+  void prep_mom_grid() {
+    if (num_k_proc>100)
+      k_values.resize(num_k_proc);
+    long i_k_min=0;
+    long i_k_max=num_k_surff;
+#ifdef HAVE_MPI
+    i_k_min=i_proc*num_k_proc;
+    i_k_max=(i_proc+1)*num_k_proc;
+    if (i_proc==(num_proc-1))
+      i_k_max+=num_k_surff%num_proc;
+#endif
+    if (delta_k_scheme==1) {
+      const double delta_k_surff=k_max_surff/double(num_k_surff);
+      for (long i_loop=i_k_min; i_loop<i_k_max; i_loop++) {
+	k_values[i_loop-i_k_min]=double(i_loop)*delta_k_surff;
+      };
+    }
+    else if (delta_k_scheme==2) {
+      const double delta_k_surff=pow2(k_max_surff)/double(num_k_surff);
+      for (long i_loop=i_k_min; i_loop<i_k_max; i_loop++) {
+	k_values[i_loop-i_k_min]=sqrt(double(i_loop)*delta_k_surff);
+      };
+    }
+    else {
+      cerr << "delta_k_scheme can only be 1 for equal spaceing in k or 2 for equal spacing in k^2" << endl;
+      exit(-42);
+    };
+    cout << " I am process " << i_proc << " My first k value " << k_values[0] << endl;
+    // min and max \theta should always be 0 and \pi
+    // it is more convenient if number of thetas is odd
+    if (num_theta_surff%2==0) num_theta_surff++;
+    if (num_theta_surff<3) num_theta_surff=3;
+    if (num_theta_surff>101) thetas_surff.resize(num_theta_surff);
+    const double delta_theta=M_PI/double(num_theta_surff-1);
+
+    for (long i_loop=0; i_loop<num_theta_surff; i_loop++) {
+      thetas_surff[i_loop]=(i_loop)*delta_theta;
+    };
+    
+    // min and max \phi should always be 0 and 2 \pi
+    // num_phi_surff=50;
+    // it is more convenient if number of phis is even
+    // if (num_phi_surff%2==1) num_theta_surff++;
+    // if (num_phi_surff<4) num_phi_surff=4;
+    if (num_phi_surff>101) phis_surff.resize(num_phi_surff);
+    const double delta_phi=2.0*M_PI/double(num_phi_surff);
+
+    for (long i_loop=0; i_loop<num_phi_surff; i_loop++) {
+      phis_surff[i_loop]=(i_loop)*delta_phi;
+    };
+  };
+
+  void prep_space() {
+    // the size of the result after summing over the $\ell$s and $m$s
+    // const long num_spectrum_size_surff=num_k_proc*num_theta_surff*num_phi_surff;
+    // spectrum_surff.reset(new cplxd[num_spectrum_size_surff]);
+   
+    // now we need two chunks of memory for the time integral of the orbitals (space for every theta, phi, k, l, m for scheme 1 or k, l1, l2, m1, m2 for scheme 2)
+    // more space is needed for the 44 mode
+    const long num_psi_size_surff=(expansion_scheme==1)?(ell_m_grid_size*num_theta_surff*num_phi_surff*num_k_proc):ell_m_grid_size*num_k_proc*ell_m_grid_size;
+
+    if (expansion_scheme==2)
+      partial_amplitude.reset(new cplxd[ell_m_grid_size*num_k_proc]);
+    
+    psi_surff.reset(new cplxd[num_psi_size_surff]);
+    psi_A_surff.reset(new cplxd[num_psi_size_surff]);
+    psi_deriv_surff.reset(new cplxd[num_psi_size_surff]);
+    // To be on the save side initialize with zeros
+    for (long i_loop=0; i_loop<num_psi_size_surff; i_loop++) {
+      psi_surff[i_loop]=cplxd(0.0);
+      psi_A_surff[i_loop]=cplxd(0.0);
+      psi_deriv_surff[i_loop]=cplxd(0.0);
+    };
+    // this is only used in 44 mode
+    if (qprop_dim==44) {
+      psi_A_cc_surff.reset(new cplxd[num_psi_size_surff]);
+      for (long i_loop=0; i_loop<num_psi_size_surff; i_loop++) {	
+	psi_A_cc_surff[i_loop]=cplxd(0.0);
+      };
+    };
+    // space for loading wf data
+    psi_R.reset(new cplxd[ell_m_grid_size*cache_size_t]);
+    psi_R_deriv.reset(new cplxd[ell_m_grid_size*cache_size_t]);
+    psi_buffer_R.reset(new double[ell_m_grid_size*cache_size_t*2]);
+    psi_buffer_R_deriv.reset(new double[ell_m_grid_size*cache_size_t*2]);
+    cout << "saving the time integrals will take " << double(((qprop_dim==44)?4:3)*num_psi_size_surff*16)/1.e6 << "MB of space" << endl;
+  };
+
+  // First process reads the data from file and broadcasts it to the rest. The buffers are necessary because not all mpi implementations know copmlex<double>.
+  // The chunk of data read in one step is determined by cache_size_t (a number of timesteps).
+  long read_psi_data() {
+#ifdef HAVE_BOOST
+    boost::timer tim;
+#endif
+    // Actually MPI_Bcast will convert this back to int..what a waste
+    long count=0;
+    if (i_proc==0) {
+      while (psi.good() && count<(cache_size_t*ell_m_grid_size)) { 
+	psi.read(reinterpret_cast< char* >(&psi_R[count]), sizeof(cplxd));
+	dpsi_dr.read(reinterpret_cast< char* >(&psi_R_deriv[count]), sizeof(cplxd));
+#ifdef HAVE_MPI
+	psi_buffer_R[2*count]=real(psi_R[count]); psi_buffer_R[2*count+1]=imag(psi_R[count]);
+	psi_buffer_R_deriv[2*count]=real(psi_R_deriv[count]); psi_buffer_R_deriv[2*count+1]=imag(psi_R_deriv[count]);
+#endif
+	// check if there is more data or end of file
+	psi.peek();
+	count++;      
+      };
+    };
+#ifdef HAVE_MPI
+    MPI_Bcast(&count, 1, MPI_LONG, 0, MPI_COMM_WORLD);
+    MPI_Bcast(psi_buffer_R_deriv.get(), 2*count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(psi_buffer_R.get(), 2*count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    for (long i=0; i<count; i++) {
+      psi_R[i]=cplxd(psi_buffer_R[2*i], psi_buffer_R[2*i+1]);
+      psi_R_deriv[i]=cplxd(psi_buffer_R_deriv[2*i], psi_buffer_R_deriv[2*i+1]);
+    };
+#endif
+
+#ifdef HAVE_BOOST
+    cout << "time for data reading: " << tim.elapsed() << " for proc "<< i_proc << endl;
+#endif
+
+    return count;
+  };
+  
+  inline long index_ell_theta_k(long i_ell, long i_theta, long i_k) const {
+    return  i_ell + i_theta*ell_grid_size + i_k*ell_grid_size*num_theta_surff;
+  };
+  
+  void time_integration_theta_phi(long start_t, long stop_t) {
+    // time integration for t-surff
+    for (long i_k=0; i_k<num_k_proc; i_k++) {
+      const double k=k_values[i_k];
+      for (long i_theta=0; i_theta<num_theta_surff; i_theta++) {
+	const double cos_theta=cos(thetas_surff[i_theta]);
+	for (long i_t=start_t; i_t<stop_t; i_t++) {
+	  const long cache_i_t=i_t-start_t;
+	  const double time=delta_t*double(i_t);
+	  const double hanning_t=hanning_win(time);
+	  const double alpha_t=vecpot_z.integral(time);
+	  const double A_t=vecpot_z(time, 0);
+	  // H(t) e^{i k^2 t/2 + ik_z \alpha_z(t)}
+	  const cplxd hanning_t_exp_volkov=hanning_t*exp(cplxd(0., 1.)*k*k*time*0.5 + cplxd(0., 1.)*k*cos_theta*alpha_t);
+	  for (long i_ell=0; i_ell<ell_grid_size; i_ell++) {
+	    const long ind_surff=index_ell_theta_k(i_ell, i_theta, i_k);
+	    const long ind_wave=i_ell + cache_i_t*ell_grid_size;
+	    // \psi_{\ell}(k,R,T) &=\int_0^T dt e^{i k^2 t/2 + ik_z \alpha_z(t)} \varphi_{\ell, m=0}(R,t)
+	    psi_surff[ind_surff]      +=hanning_t_exp_volkov*psi_R[ind_wave];
+	    psi_A_surff[ind_surff]    +=A_t*hanning_t_exp_volkov*psi_R[ind_wave];
+	    // \psi'_{\ell}(k,R,T) &=\int_0^T dt e^{i k^2 t/2 + ik_z \alpha_z(t)} \partial_r \varphi_{\ell, m=0}(r,t) \vert_{r=R}'
+	    psi_deriv_surff[ind_surff]+=hanning_t_exp_volkov*psi_R_deriv[ind_wave];
+	  };
+	};
+      };
+    };
+  };
+
+  inline long index_ell_m_theta_phi_k(long i_ell, long i_m, long i_theta, long i_phi, long i_k) const {
+    return  ((i_ell+1)*(i_ell+1)-(i_ell+1)+i_m) + i_theta*ell_m_grid_size + i_phi*num_theta_surff*ell_m_grid_size + i_k*num_phi_surff*num_theta_surff*ell_m_grid_size;
+  };
+  
+  void time_integration_theta_phi_ell_m(long start_t, long stop_t) {
+    // time integration for t-surff
+    for (long i_k=0; i_k<num_k_proc; i_k++) {
+      const double k=k_values[i_k];
+      for (long i_phi=0; i_phi<num_phi_surff; i_phi++) {
+	const double cos_phi=cos(phis_surff[i_phi]);
+	const double sin_phi=sin(phis_surff[i_phi]);
+	for (long i_theta=0; i_theta<num_theta_surff; i_theta++) {
+	  const double sin_theta=sin(thetas_surff[i_theta]);
+	  for (long i_t=start_t; i_t<stop_t; i_t++) {
+	    const long cache_i_t=i_t-start_t;
+	    const double time=delta_t*double(i_t);
+	    const double hanning_t=hanning_win(time);
+	    const double alpha_x_t=vecpot_x.integral(time);
+	    const double alpha_y_t=vecpot_y.integral(time);
+	    const cplxd A_tilde(vecpot_x(time, 0), vecpot_y(time, 0));
+	    const cplxd hanning_t_exp_volkov=hanning_t*exp(cplxd(0., 1.)*k*k*time*0.5 + cplxd(0., 1.)*k*cos_phi*sin_theta*alpha_x_t + cplxd(0., 1.)*sin_theta*k*sin_phi*alpha_y_t);
+	    for (long i_ell=0; i_ell<ell_grid_size; i_ell++) {
+	      for (long i_m=-i_ell; i_m<(i_ell+1); i_m++) {
+		const long ind_surff=index_ell_m_theta_phi_k(i_ell, i_m, i_theta, i_phi, i_k);
+		const long ind_wave=index_ell1_m1_i_t(i_ell, i_m, cache_i_t);
+		psi_surff[ind_surff]      +=hanning_t_exp_volkov*psi_R[ind_wave];
+		psi_A_surff[ind_surff]    +=A_tilde*hanning_t_exp_volkov*psi_R[ind_wave];
+		psi_A_cc_surff[ind_surff] +=conj(A_tilde)*hanning_t_exp_volkov*psi_R[ind_wave];
+		psi_deriv_surff[ind_surff]+=hanning_t_exp_volkov*psi_R_deriv[ind_wave];
+	      };
+	    };
+	  };
+	};
+      };
+    };
+  };
+    
+  inline long index_ell1_ell2_k(long i_ell1, long i_ell2, long i_k) const {
+    return  i_ell1 + i_ell2*ell_grid_size + i_k*ell_grid_size*ell_grid_size;
+  };
+  
+  void time_integration_ell1_ell2(long start_t, long stop_t) {
+    // time integration for t-surff
+    double j_l2kalpha[ell_grid_size+1];
+    for (long i_k=0; i_k<num_k_proc; i_k++) {
+      const double k=k_values[i_k];
+	for (long i_t=start_t; i_t<stop_t; i_t++) {
+	  const long cache_i_t=i_t-start_t;
+	  const double time=delta_t*double(i_t);
+	  const double hanning_t=hanning_win(time);
+	  const double alpha_t=vecpot_z.integral(time);
+	  const double A_t=vecpot_z(time, 0);
+	  // e^{ik^2t/2} j_{\ell_2}(k \alpha(t))
+	  const cplxd hanning_t_exp = hanning_t*exp(cplxd(0., 1.)*k*k*time*0.5);
+	  fill_bessel_array(k, alpha_t, j_l2kalpha);
+	  for (long i_ell2=0; i_ell2<ell_grid_size; i_ell2++) {
+	    for (long i_ell=0; i_ell<ell_grid_size; i_ell++) {
+	      const long ind_surff=index_ell1_ell2_k(i_ell, i_ell2, i_k);
+	      const long ind_wave=i_ell + cache_i_t*ell_grid_size;
+	      psi_surff[ind_surff] += hanning_t_exp*j_l2kalpha[i_ell2]*psi_R[ind_wave];
+	      psi_A_surff[ind_surff] += A_t*hanning_t_exp*j_l2kalpha[i_ell2]*psi_R[ind_wave];
+	      psi_deriv_surff[ind_surff] += hanning_t_exp*j_l2kalpha[i_ell2]*psi_R_deriv[ind_wave];
+	  };
+	};
+      };
+    };
+  };
+
+  inline long index_ell1_m1_ell2_m2_k(long i_ell1, long i_m1, long i_ell2, long i_m2, long i_k) const {
+    const long ell_grid_size_2=ell_grid_size*ell_grid_size;
+    return  ((i_ell1+1)*(i_ell1+1)-(i_ell1+1)+i_m1) + ((i_ell2+1)*(i_ell2+1)-(i_ell2+1)+i_m2)*ell_grid_size_2 + i_k*ell_grid_size_2*ell_grid_size_2;
+  };
+
+  inline long index_ell1_m1_i_t(long i_ell1, long i_m1, long i_t) const {
+    const long ell_grid_size_2=ell_grid_size*ell_grid_size;
+    return  ((i_ell1+1)*(i_ell1+1)-(i_ell1+1)+i_m1) + i_t*ell_grid_size_2;
+  };
+  
+  void time_integration_ell1_m1_ell2_m2(long start_t, long stop_t) {
+    // time integration for t-surff
+    double j_l2kalpha[ell_grid_size+1];
+    for (long i_k=0; i_k<num_k_proc; i_k++) {
+      const double k=k_values[i_k];
+      for (long i_t=start_t; i_t<stop_t; i_t++) {
+	const long cache_i_t=i_t-start_t;
+	const double time=delta_t*double(i_t);
+	const double hanning_t=hanning_win(time);
+	const double alpha_x=vecpot_x.integral(time);
+	const double alpha_y=vecpot_y.integral(time);
+	const double abs_alpha=sqrt(pow2(alpha_x)+pow2(alpha_y));
+	const double phi_alpha=atan2(alpha_y, alpha_x);
+	const cplxd A_tilde(vecpot_x(time, 0), vecpot_y(time, 0));
+	// const cplxd A_tilde(0,0);
+	// e^{ik^2t/2} j_{\ell_2}(k \alpha(t))
+	const cplxd hanning_t_exp = hanning_t*exp(cplxd(0., 1.)*k*k*time*0.5);
+	fill_bessel_array(k, abs_alpha, j_l2kalpha);
+	for (long i_ell2=0; i_ell2<ell_grid_size; i_ell2++) {
+	  for (long i_m2=-i_ell2; i_m2<i_ell2+1; i_m2++) {
+	    const cplxd Y_ell2_m2=Ylm_prefactor(i_m2)*gsl_sf_legendre_sphPlm(i_ell2, labs(i_m2), 0)*exp(cplxd(0, double(i_m2)*phi_alpha));
+	    const cplxd A_tilde_hanning_t_exp_j_l2kalpha_Y_ell2_m2=A_tilde*hanning_t_exp*j_l2kalpha[i_ell2]*Y_ell2_m2;
+	    const cplxd A_tilde_cc_hanning_t_exp_j_l2kalpha_Y_ell2_m2=conj(A_tilde)*hanning_t_exp*j_l2kalpha[i_ell2]*Y_ell2_m2;
+	    const cplxd hanning_t_exp_j_l2kalpha_Y_ell2_m2=hanning_t_exp*j_l2kalpha[i_ell2]*Y_ell2_m2;	    
+	    for (long i_ell1=0; i_ell1<ell_grid_size; i_ell1++) {
+	      for (long i_m1=-i_ell1; i_m1<i_ell1+1; i_m1++) {
+		const long ind_surff=index_ell1_m1_ell2_m2_k(i_ell1, i_m1, i_ell2, i_m2, i_k);
+		const long ind_wave=index_ell1_m1_i_t(i_ell1, i_m1, cache_i_t);
+		psi_surff[ind_surff] += hanning_t_exp_j_l2kalpha_Y_ell2_m2*psi_R[ind_wave];
+		psi_A_surff[ind_surff] += A_tilde_hanning_t_exp_j_l2kalpha_Y_ell2_m2*psi_R[ind_wave];
+		psi_A_cc_surff[ind_surff] += A_tilde_cc_hanning_t_exp_j_l2kalpha_Y_ell2_m2*psi_R[ind_wave];
+		psi_deriv_surff[ind_surff] += hanning_t_exp_j_l2kalpha_Y_ell2_m2*psi_R_deriv[ind_wave];
+		
+		// psi_surff[ind_surff] += hanning_t_exp*j_l2kalpha[i_ell2]*Y_ell2_m2*psi_R[ind_wave];
+		// psi_A_surff[ind_surff] += A_tilde*hanning_t_exp*j_l2kalpha[i_ell2]*Y_ell2_m2*psi_R[ind_wave];
+		// psi_A_cc_surff[ind_surff] += conj(A_tilde)*hanning_t_exp*j_l2kalpha[i_ell2]*Y_ell2_m2*psi_R[ind_wave];
+		// psi_deriv_surff[ind_surff] += hanning_t_exp*j_l2kalpha[i_ell2]*Y_ell2_m2*psi_R_deriv[ind_wave];
+	      };
+	    };
+	  };
+	};
+      };
+    };
+  };
+  
+  inline double hanning_win(double time) const {
+    double hanning = 1.0;
+    if (time>(0.5*(duration)))
+      hanning = 0.5*(1.0-cos(2.0*M_PI*time/(duration)));
+    return hanning;
+  };
+
+  inline void fill_bessel_array(double k, double R, double* j_lkr) {
+    // Function: int gsl_sf_bessel_jl_steed_array (int lmax, double x, double * result_array)
+    // This routine uses Steed’s method to compute the values of the regular spherical Bessel functions j_l(x) for l from 0 to lmax inclusive for lmax >= 0 and x >= 0, storing the results in the array result_array. The Steed/Barnett algorithm is described in Comp. Phys. Comm. 21, 297 (1981). Steed’s method is more stable than the recurrence used in the other functions but is also slower.
+    // lower maximum ell until bessel function does not return nan any more
+    long max_ell_bessel(ell_grid_size+1);
+    const double a_sign=(k*R<0.0)?-1.0:1.0;
+    do {
+      gsl_sf_bessel_jl_steed_array(max_ell_bessel, a_sign*k*R, j_lkr);
+      if (max_ell_bessel==0) {
+	exit(-1);
+	cerr << "Bessel calculation has failed!" << endl;
+      };
+      max_ell_bessel--;
+    } while (std::isnan(j_lkr[0]));
+    // now set the rest of the ells to zero
+    for (long i_ell=max_ell_bessel; i_ell<ell_grid_size+1; i_ell++) {
+      j_lkr[i_ell]=0.0;
+    };
+    // sign(k*R)^{\ell} j(|k R|)_{\ell}
+    if (a_sign<0.0) {
+      for (long i_ell=1; i_ell<ell_grid_size+1; i_ell+=2) {
+	j_lkr[i_ell]*=-1.0;
+      };
+    };
+  };
+  
+  // calculate spectrum for the case of linear polarization (34)
+  void eval_spectrum_34_theta_phi() {
+    if (labs(initial_m)>ell_grid_size) {
+      cerr << "m is to large for N_{\ell}" << endl;
+      exit(-1);
+    };
+    // and read the data from file
+    // if (from_file){
+    //   read_from_raw_file("psi-t-SURFF.raw", psi_surff.get(), num_psi_size_surff);
+    //   read_from_raw_file("psi-A-t-SURFF.raw", psi_A_surff.get(), num_psi_size_surff);
+    //   read_from_raw_file("psi-deriv-t-SURFF.raw", psi_deriv_surff.get(), num_psi_size_surff);
+    // };
+    
+    // in order to calculate the derivative of the spherical Bessel function j_l we use the j_{l+1} -> size of the array ell_grid_size+1
+    double j_lkr[ell_grid_size+1];
+    // big loop for summing over ells and such
+    ofstream tsurff_polar_dat("tsurff-polar"+to_string(i_proc)+".dat");    
+    tsurff_polar_dat.precision(17);
+    for (long i_k=0; i_k<num_k_proc; i_k++) {
+      const double k=k_values[i_k];
+      fill_bessel_array(k, R_tsurff, j_lkr);
+      for (long i_theta=0; i_theta<num_theta_surff; i_theta++) {
+	const double theta=thetas_surff[i_theta];
+	const double cos_theta=cos(thetas_surff[i_theta]);	
+	cplxd b_k(0.0, 0.0);
+	for (long i_ell=labs(initial_m); i_ell<ell_grid_size-1; i_ell++) {
+	  // $c_{\ell, m}=\sqrt{\frac{(\ell+1)^2-m^2}{(2\ell+1)(2\ell+3)}}$
+	  double c_ell_m=sqrt(pow2(i_ell+1)-pow2(initial_m))*sqrt(1./double((2*i_ell+1)*(2*i_ell+3)));
+	  // \frac{d}{dr} f_{\ell}(kr)&=-kf_{\ell+1}(kr) + \frac{\ell}{r}f_{\ell}(kr))
+	  const double j_lkr_deriv=-k*j_lkr[i_ell+1] + double(i_ell)/R_tsurff*j_lkr[i_ell];
+	  const long ind_surff=index_ell_theta_k(i_ell, i_theta, i_k);
+	  // the array Plm_theta has the entry for \ell=|m| and \theta=0 as entry zero
+	  // const long ind_Plm=i_ell-labs(initial_m)+num_Plm_one_theta*i_theta;
+	  
+	  const cplxd Ylm=Ylm_prefactor(initial_m)*gsl_sf_legendre_sphPlm (i_ell, labs(initial_m), cos_theta);
+	  const cplxd Ylp1m=Ylm_prefactor(initial_m)*gsl_sf_legendre_sphPlm (i_ell+1, labs(initial_m), cos_theta);
+		  
+	  // if we want to consider the contribution of individual $/ell$s we have to treat the part with $Y_{\ell+1}$ separately (sorry for the ugliness)
+	  const cplxd b_kl_Ylm_1=cplxd(0., 2.)*c_ell_m*pow_neg_i(i_ell+1)*j_lkr[i_ell+1]*Ylp1m*psi_A_surff[ind_surff];
+	  const cplxd b_kl_psi_1=+cplxd(0., 2.)*c_ell_m*pow_neg_i(i_ell)*j_lkr[i_ell]*Ylm*psi_A_surff[ind_surff+1];
+	  const cplxd b_kl=b_kl_Ylm_1
+	    +b_kl_psi_1
+	    +pow_neg_i(i_ell)*j_lkr[i_ell]*Ylm*(-1.0/R_tsurff*psi_surff[ind_surff]+psi_deriv_surff[ind_surff])
+	    -pow_neg_i(i_ell)*j_lkr_deriv*Ylm*psi_surff[ind_surff];
+	  b_k+=b_kl;
+	};
+	b_k*=cplxd(0.0, -0.5)*4.*M_PI/sqrt(pow3(2.*M_PI))*R_tsurff*delta_t;
+	// tsurff_polar_dat << k << " " << theta << " " << real(b_k) << " " << imag(b_k) << endl;
+	tsurff_polar_dat << k*k*0.5 << " " << k << " " << theta << " " << norm(b_k)*k << endl;
+      };
+      // line break for every new theta
+      tsurff_polar_dat << endl;
+    };
+  };
+
+  void eval_spectrum_44_theta_phi() {    
+    // in order to calculate the derivative of the spherical Bessel function j_l we use the j_{l+1} -> size of the array ell_grid_size+1
+    double j_lkr[ell_grid_size+1];
+    // big ass loop for summing over ells and such
+    ofstream tsurff_polar_dat("tsurff-polar"+to_string(i_proc)+".dat");
+    tsurff_polar_dat.precision(17);
+    for (long i_k=0; i_k<num_k_proc; i_k++) {
+      const double k=k_values[i_k];
+      for (long i_theta=0; i_theta<num_theta_surff; i_theta++) {
+	const double theta=thetas_surff[i_theta];
+	const double cos_theta=cos(thetas_surff[i_theta]);
+	for (long i_phi=0; i_phi<num_phi_surff; i_phi++) {
+	  const double phi=phis_surff[i_phi];
+	  fill_bessel_array(k,R_tsurff,j_lkr);		  
+	  cplxd b_k(0.0, 0.0);
+	  const double sqrt_2=sqrt(2.0);
+	  for (long i_ell=0; i_ell<ell_grid_size; i_ell++) {
+	    // \frac{d}{dr} f_{\ell}(kr)&=-kf_{\ell+1}(kr) + \frac{\ell}{r}f_{\ell}(kr))
+	    const double j_lkr_deriv=-k*j_lkr[i_ell+1] + double(i_ell)/R_tsurff*j_lkr[i_ell];
+	    // write out the Bessel functions for debugging purposes
+	    for (long i_m=-long(i_ell); i_m<long(i_ell+1); i_m++) {
+	      const long ind_surff = index_ell_m_theta_phi_k(i_ell, i_m, i_theta, i_phi, i_k);
+
+	      // Y_lm_prefactor is 1 if i_m \geq 0 or (-1)^m for i_m<0, Y_l,-m=(-1)^m Y_l,m^* 
+	      // const cplxd Ylm=Ylm_prefactor(i_m)*Plm_theta[ind_Plm]*exp(cplxd(0.0, double(i_m)*phi));
+	      const cplxd Ylm=Ylm_prefactor(i_m)*gsl_sf_legendre_sphPlm (i_ell, labs(i_m), cos_theta)*exp(cplxd(0.0, double(i_m)*phi));
+
+	      const long N_ell = ell_grid_size;
+	      if (i_ell>0 && i_m>=-long(i_ell)+2) {
+		const long ind_surff_mm1_ellm1=index_ell_m_theta_phi_k(i_ell-1,i_m-1,i_theta,i_phi,i_k);
+		b_k-=sqrt_2*pow_neg_i(i_ell)*j_lkr[i_ell]*Ylm*psi_A_cc_surff[ind_surff_mm1_ellm1]*clebsch_mm1_ellm1(i_ell, i_m);
+	      };
+	      if (i_ell>0 && i_m<=long(i_ell)-2) {
+		const long ind_surff_mp1_ellm1=index_ell_m_theta_phi_k(i_ell-1,i_m+1,i_theta,i_phi,i_k);
+		b_k+=sqrt_2*pow_neg_i(i_ell)*j_lkr[i_ell]*Ylm*psi_A_surff[ind_surff_mp1_ellm1]*clebsch_mp1_ellm1(i_ell, i_m);
+	      };
+	      if (i_ell<(N_ell-1)) {
+		const long ind_surff_mm1_ellp1=index_ell_m_theta_phi_k(i_ell+1,i_m-1,i_theta,i_phi,i_k);
+		b_k+=sqrt_2*pow_neg_i(i_ell)*j_lkr[i_ell]*Ylm*psi_A_cc_surff[ind_surff_mm1_ellp1]*clebsch_mm1_ellp1(i_ell, i_m);
+	      };
+	      if (i_ell<(N_ell-1)) {
+		const long ind_surff_mp1_ellp1=index_ell_m_theta_phi_k(i_ell+1,i_m+1,i_theta,i_phi,i_k);
+		b_k-=sqrt_2*pow_neg_i(i_ell)*j_lkr[i_ell]*Ylm*psi_A_surff[ind_surff_mp1_ellp1]*clebsch_mp1_ellp1(i_ell, i_m);
+	      };
+	      b_k+=pow_neg_i(i_ell+1)*j_lkr[i_ell]*Ylm*(-1.0/R_tsurff*psi_surff[ind_surff]+psi_deriv_surff[ind_surff])
+		-pow_neg_i(i_ell+1)*j_lkr_deriv*Ylm*psi_surff[ind_surff];
+	    };
+	  };
+	  b_k*=1.0/sqrt(2.*M_PI)*R_tsurff*delta_t;
+	  // tsurff_polar_dat  << k << " " << theta << " " << phi << " " << real(b_k) << " " << imag(b_k) << endl;
+	  tsurff_polar_dat << k*k*0.5 << " " << k << " " << theta << " " << phi << " " << norm(b_k)*k << endl;
+	};
+	// line break for every new phi
+	tsurff_polar_dat << endl;
+      };
+    };
+  };    
+  
+  inline long index_ell1_ell2(long i_ell1, long i_ell2) const {
+    return  i_ell1 + i_ell2*ell_grid_size;
+  };
+  
+  // get the Wigner 3j coefficients and calculate necessary prefactors without any tricks (for linear polarization and fixed m) 
+  void fill_wigner_prefactors(long ell, long m, double_ptr& prefactor) {
+    for (long i_ell2=0; i_ell2<ell_grid_size; i_ell2++) {
+      for (long i_ell1=0; i_ell1<ell_grid_size; i_ell1++) {
+	const double wig0 = gsl_sf_coupling_3j (2*ell, 2*i_ell1, 2*i_ell2, 0, 0, 0);
+	const double wig1 = gsl_sf_coupling_3j (2*ell, 2*i_ell1, 2*i_ell2, -2*m, 2*m, 0);
+	prefactor[index_ell1_ell2(i_ell1, i_ell2)]=sqrt(double((2*ell+1)*(2*i_ell1+1)))*double(2*i_ell2+1)*wig0*wig1;
+      };
+    };
+  };
+  
+  // $c_{\ell, m}=\sqrt{\frac{(\ell+1)^2-m^2}{(2\ell+1)(2\ell+3)}}$
+  inline double c_ell_m(long ell, long m) const {
+#ifdef ADDITIONAL_TESTS
+    if ((pow2(ell+1)-pow2(m))<0) {
+      cerr << " c_ell_m " << ell << " " << m << endl;
+      exit(-1);
+    };
+#endif
+    return sqrt(pow2(ell+1)-pow2(m))*sqrt(1./double((2*ell+1)*(2*ell+3)));
+  };
+
+  inline long index_ell_k(long i_ell, long i_k) const {
+    return  i_ell + i_k*ell_grid_size;
+  };
+
+  // calculate the partial spectra for linear polarization and fixed $m$
+  // side effects: writes result to partial_amplitude
+  // reads time integrals (equation (41) in qprop-tsurff paper) form arrays psi_A_surff psi_surff and psi_deriv_surff
+  void eval_partial_spectra_34_ell1_ell2() {
+    // in order to calculate the derivative of the spherical Bessel function j_l we use the j_{l+1} -> size of the array ell_grid_size+1
+    double j_lkr[ell_grid_size+1];
+    double_ptr wigner_pre(new double[ell_grid_size*ell_grid_size]);
+    // for every \ell and k calculate \sum_{\ell_1,\ell_2} w_{\ell,\ell_1,\ell_2,m} (I_0, ...)
+    for (long i_ell=labs(initial_m); i_ell<ell_grid_size-1; i_ell++) {
+      fill_wigner_prefactors(i_ell, initial_m, wigner_pre);
+      for (long i_k=0; i_k<num_k_proc; i_k++) {
+	const double k=k_values[i_k];
+	fill_bessel_array(k, R_tsurff, j_lkr);
+	cplxd b_kl_sum(0.0);
+	for (long i_ell1=labs(initial_m); i_ell1<ell_grid_size-1; i_ell1++) {
+	  // $c_{\ell, m}=\sqrt{\frac{(\ell+1)^2-m^2}{(2\ell+1)(2\ell+3)}}$
+	  double c_ell1_m=c_ell_m(i_ell1, initial_m);
+	  double c_ell1m1_m=c_ell_m(i_ell1-1, initial_m);
+	  // \frac{d}{dr} f_{\ell}(kr)&=-kf_{\ell+1}(kr) + \frac{\ell}{r}f_{\ell}(kr))
+	  const double j_lkr_deriv=-k*j_lkr[i_ell1+1] + double(i_ell1)/R_tsurff*j_lkr[i_ell1];
+	  // for (long i_ell2=labs(initial_m); i_ell2<ell_grid_size-1; i_ell2++) {
+	  for (long i_ell2=0; i_ell2<ell_grid_size-1; i_ell2++) {
+	    const long ind_surff=index_ell1_ell2_k(i_ell1, i_ell2, i_k);
+	    const long ind_surff_next=index_ell1_ell2_k(i_ell1+1, i_ell2, i_k);
+	    const long ind_surff_prev=index_ell1_ell2_k(i_ell1-1, i_ell2, i_k);
+	    b_kl_sum+=wigner_pre[index_ell1_ell2(i_ell1, i_ell2)]*pow_neg_1(initial_m)*pow_neg_i(i_ell1+1)*pow_i(i_ell2)*
+	      (cplxd(0,2)*j_lkr[i_ell1]*(((i_ell1>labs(initial_m))?c_ell1m1_m*psi_A_surff[ind_surff_prev]:0.0)
+					 +c_ell1_m*psi_A_surff[ind_surff_next])
+	       + j_lkr[i_ell1]*(psi_deriv_surff[ind_surff]-psi_surff[ind_surff]/R_tsurff)
+	       - j_lkr_deriv*psi_surff[ind_surff]);
+	  };
+	};
+	partial_amplitude[index_ell_k(i_ell, i_k)] = b_kl_sum*R_tsurff*delta_t/sqrt(2.*M_PI);
+      };
+    };
+  };
+
+  // calculate angle and energy resolved spectrum for linear polarization and fixed $m$
+  // side effects: writes to file tsurff-polari_proc.dat
+  // reads partial spectra from array partial_amplitude
+  void eval_spectrum_34_ell1_ell2() {
+    // big ass loop for summing over ells and such
+    ofstream tsurff_polar_dat("tsurff-polar"+to_string(i_proc)+".dat");    
+    tsurff_polar_dat.precision(17);
+    for (long i_k=0; i_k<num_k_proc; i_k++) {
+      const double k=k_values[i_k];
+      for (long i_theta=0; i_theta<num_theta_surff; i_theta++) {
+	const double theta=thetas_surff[i_theta];
+	const double cos_theta=cos(thetas_surff[i_theta]);
+	cplxd b_k(0.0, 0.0);
+	for (long i_ell=labs(initial_m); i_ell<ell_grid_size-1; i_ell++) {
+	  const cplxd Ylm=Ylm_prefactor(initial_m)*gsl_sf_legendre_sphPlm (i_ell, labs(initial_m), cos_theta);
+	  b_k+=partial_amplitude[index_ell_k(i_ell, i_k)]*Ylm;
+	};
+	// tsurff_polar_dat << k << " " << theta << " " << real(b_k) << " " << imag(b_k) << endl;
+	tsurff_polar_dat << k*k*0.5 << " " << k << " " << theta << " " << norm(b_k)*k << endl;
+      };
+      // line break for every new theta
+      tsurff_polar_dat << endl;
+    };
+  };
+
+  inline long index_ell_m_k(long i_ell, long i_m, long i_k) const {
+    const long ell_grid_size_2=ell_grid_size*ell_grid_size;
+    return ((i_ell+1)*(i_ell+1)-(i_ell+1)+i_m) + i_k*ell_grid_size_2;
+  };
+
+  inline long index_ell1_m1_ell2_m2(long i_ell1, long i_m1, long i_ell2, long i_m2) const {
+    const long ell_grid_size_2=ell_grid_size*ell_grid_size;
+    return  ((i_ell1+1)*(i_ell1+1)-(i_ell1+1)+i_m1) + ((i_ell2+1)*(i_ell2+1)-(i_ell2+1)+i_m2)*ell_grid_size_2;
+  };
+  
+  // calculate the prefactors without any tricks (inefficient)
+  void fill_wigner_prefactors_ineff_44(long i_ell, long i_m, double_ptr& prefactor) {
+    for (long i_ell2=0; i_ell2<ell_grid_size; i_ell2++) {
+      for (long i_m2=-(i_ell2); i_m2<(i_ell2+1); i_m2++) {
+	for (long i_ell1=0; i_ell1<ell_grid_size; i_ell1++) {
+	  for (long i_m1=-(i_ell1); i_m1<(i_ell1+1); i_m1++) {
+	    const double wig0 = gsl_sf_coupling_3j (2*i_ell, 2*i_ell1, 2*i_ell2, 0, 0, 0);
+	    const double wig1 = gsl_sf_coupling_3j (2*i_ell, 2*i_ell1, 2*i_ell2, -2*i_m, 2*i_m1, -2*i_m2);
+	    prefactor[index_ell1_m1_ell2_m2(i_ell1, i_m1, i_ell2, i_m2)]=sqrt(double((2*i_ell+1)*(2*i_ell1+1)*(2*i_ell2+1)))*wig0*wig1;
+	  };
+	};
+      };
+    };
+  };
+
+  inline long index_ell1_m1_ell2(long i_ell1, long i_m1, long i_ell2) const {
+    const long ell_grid_size_2=ell_grid_size*ell_grid_size;
+    return  ((i_ell1+1)*(i_ell1+1)-(i_ell1+1)+i_m1) + i_ell2*ell_grid_size_2;
+  };
+  
+  // get the Wigner 3j coefficients and  calculate the necessary prefactors using -m+m_1-m_2=0 (for polarization in xy-plane)
+  void fill_wigner_prefactors_44(long i_ell, long i_m, double_ptr& prefactor) {
+    for (long i_ell2=0; i_ell2<ell_grid_size; i_ell2++) {
+      for (long i_ell1=0; i_ell1<ell_grid_size; i_ell1++) {
+	for (long i_m1=-(i_ell1); i_m1<(i_ell1+1); i_m1++) {
+	  const double wig0 = gsl_sf_coupling_3j (2*i_ell, 2*i_ell1, 2*i_ell2, 0, 0, 0);
+	  const double wig1 = gsl_sf_coupling_3j (2*i_ell, 2*i_ell1, 2*i_ell2, -2*i_m, 2*i_m1, -2*(i_m1-i_m));
+	  prefactor[index_ell1_m1_ell2(i_ell1, i_m1, i_ell2)]=sqrt(double((2*i_ell+1)*(2*i_ell1+1)*(2*i_ell2+1)))*wig0*wig1;
+	};
+      };
+    };
+  };
+
+#define TESTS
+  //  \sqrtfrac{(\ell + m - 1)(\ell + m)}{2(2\ell - 1)(2\ell + 1)}
+  inline double clebsch_mm1_ellm1(long ell, long m) {
+    const double numerator=(ell + m - 1.0)*(ell + m);
+    const double denominator=(2.0*(2.0*ell - 1.0)*(2.0*ell + 1.0));
+#ifdef TESTS
+    if (numerator/denominator < 0.0) {
+      cerr << "negative sqrt in clebsch_mm1_ellm1 for m=" << m << " ell=" << ell << endl;      
+    };
+#endif
+    return sqrt(numerator/denominator);
+  };
+
+  //  \sqrtfrac{(\ell - m + 1)(\ell - m + 2)(\ell + 1)}{(2\ell + 1)(2\ell + 2)(2\ell + 3)}
+  inline double clebsch_mm1_ellp1(long ell, long m) {
+    const double numerator=(ell - m + 1.0)*(ell - m + 2.0)*(ell + 1.0);
+    const double denominator=(1.0*(2.0*ell + 1.0)*(2.0*ell + 2.0)*(2.0*ell + 3.0));
+#ifdef TESTS
+    if (numerator/denominator < 0.0) {
+      cerr << "negative sqrt in clebsch_mm1_ellp1 for m=" << m << " ell=" << ell << endl;      
+    };
+#endif
+    return sqrt(numerator/denominator);
+  };
+
+  // \sqrtfrac{(\ell - m - 1)(\ell - m)}{2(2\ell - 1)(2\ell + 1)}
+  inline double clebsch_mp1_ellm1(long ell, long m) {
+    const double numerator=(ell - m - 1.0)*(ell - m);
+    const double denominator=(2.0*(2.0*ell - 1.0)*(2.0*ell + 1.0));
+#ifdef TESTS
+    if (numerator/denominator < 0.0) {
+      cerr << "negative sqrt in clebsch_mp1_ellm1 for m=" << m << " ell=" << ell << endl;      
+    };
+#endif
+    return sqrt(numerator/denominator);
+  };
+
+  // \sqrtfrac{(\ell + m + 1)(\ell + m + 2)(\ell + 1)}{(2\ell + 1)(2\ell + 2)(2\ell + 3)}
+  inline double clebsch_mp1_ellp1(long ell, long m) {
+    const double numerator=(ell + m + 1.0)*(ell + m + 2.0)*(ell + 1.0);
+    const double denominator=(1.0*(2.0*ell + 1.0)*(2.0*ell + 2.0)*(2.0*ell + 3.0));
+#ifdef TESTS
+    if (numerator/denominator < 0.0) {
+      cerr << "negative sqrt in clebsch_mp1_ellp1 for m=" << m << " ell=" << ell << endl;
+    };
+#endif
+    return sqrt(numerator/denominator);
+  };
+  
+  void eval_partial_spectra_44_ell1_ell2() {
+    // in order to calculate the derivative of the spherical Bessel function j_l we use the j_{l+1} -> size of the array ell_grid_size+1
+    double j_lkr[ell_grid_size+1];
+    // double wigner_pre[ell_grid_size*ell_grid_size];
+    double_ptr wigner_pre(new double[ell_grid_size*ell_grid_size*ell_grid_size]);
+    // big ass loop for summing over ells and such
+    ofstream tsurff_polar_dat("tsurff-polar"+to_string(i_proc)+".dat");    
+    tsurff_polar_dat.precision(17);
+    for (long i_ell=0; i_ell<ell_grid_size; i_ell++) {
+      for (long i_m=-(i_ell); i_m<(i_ell+1); i_m++) {
+	fill_wigner_prefactors_44(i_ell, i_m, wigner_pre);
+	for (long i_k=0; i_k<num_k_proc; i_k++) {
+	  const double k=k_values[i_k];
+	  fill_bessel_array(k, R_tsurff, j_lkr);
+	  cplxd b_klm_sum(0.0);
+	  for (long i_ell1=0; i_ell1<ell_grid_size; i_ell1++) {
+	    for (long i_m1=-(i_ell1); i_m1<(i_ell1+1); i_m1++) {
+	      // use selection rule for Wigner symbols
+	      const long i_m2=i_m1-i_m;
+	      // \frac{d}{dr} f_{\ell}(kr)&=-kf_{\ell+1}(kr) + \frac{\ell}{r}f_{\ell}(kr))
+	      const double j_lkr_deriv=-k*j_lkr[i_ell1+1] + double(i_ell1)/R_tsurff*j_lkr[i_ell1];
+	      for (long i_ell2=0; i_ell2<ell_grid_size; i_ell2++) {
+		const long ind_surff=index_ell1_m1_ell2_m2_k(i_ell1, i_m1, i_ell2, i_m2, i_k);
+		const double w_ellmell1m1ell2=wigner_pre[index_ell1_m1_ell2(i_ell1, i_m1, i_ell2)];
+		if (w_ellmell1m1ell2!=0) {
+		  // cout << i_ell << " " << i_m << " " << i_ell1 << " " << i_m1 << " " << i_ell2 << " " << i_m2 << " " << w_ellmell1m1ell2 << endl;
+		  const long N_ell = ell_grid_size;
+		  if (i_ell1>0 && i_m1>=-long(i_ell1)+2) {
+		    const long ind_surff_mm1_ellm1=index_ell1_m1_ell2_m2_k(i_m1-1, long(i_ell1)-1, i_ell2, i_m2, i_k);
+		    b_klm_sum-=w_ellmell1m1ell2*pow_neg_1(i_m1+i_m2)*pow_i(i_ell2-i_ell1)*j_lkr[i_ell1]*psi_A_cc_surff[ind_surff_mm1_ellm1]*clebsch_mm1_ellm1(i_ell1, i_m1);
+		  };
+		  if (i_ell1>0 && i_m1<=long(i_ell1)-2) {
+		    const long ind_surff_mp1_ellm1=index_ell1_m1_ell2_m2_k(i_m1+1, long(i_ell1)-1, i_ell2, i_m2, i_k);
+		    b_klm_sum+=w_ellmell1m1ell2*pow_neg_1(i_m1+i_m2)*pow_i(i_ell2-i_ell1)*j_lkr[i_ell1]*psi_A_surff[ind_surff_mp1_ellm1]*clebsch_mp1_ellm1(i_ell1, i_m1);
+		  };
+		  if (i_ell1<(N_ell-1)) {
+		    const long ind_surff_mm1_ellp1=index_ell1_m1_ell2_m2_k(i_m1-1, i_ell1+1, i_ell2, i_m2, i_k);
+		    b_klm_sum+=w_ellmell1m1ell2*pow_neg_1(i_m1+i_m2)*pow_i(i_ell2-i_ell1)*j_lkr[i_ell1]*psi_A_cc_surff[ind_surff_mm1_ellp1]*clebsch_mm1_ellp1(i_ell1, i_m1);
+		  };
+		  if (i_ell1<(N_ell-1)) {
+		    const long ind_surff_mp1_ellp1=index_ell1_m1_ell2_m2_k(i_m1+1, i_ell1+1, i_ell2, i_m2, i_k);
+		    b_klm_sum-=w_ellmell1m1ell2*pow_neg_1(i_m1+i_m2)*pow_i(i_ell2-i_ell1)*j_lkr[i_ell1]*psi_A_surff[ind_surff_mp1_ellp1]*clebsch_mp1_ellp1(i_ell1, i_m1);
+		  };
+		
+		  b_klm_sum+=cplxd(0,-sqrt(0.5))*w_ellmell1m1ell2*pow_neg_1(i_m1+i_m2)*pow_i(i_ell2-i_ell1)*
+		    (j_lkr[i_ell1]*(-1.0/R_tsurff*psi_surff[ind_surff] + psi_deriv_surff[ind_surff])-j_lkr_deriv*psi_surff[ind_surff]);
+		};
+	      };
+	    };
+	  };
+	  partial_amplitude[index_ell_m_k(i_ell, i_m, i_k)] = b_klm_sum*2.0*R_tsurff*delta_t;
+	};
+      };
+    };
+  };
+  
+  void eval_spectrum_44_ell1_ell2() {
+    // big ass loop for summing over ells and such
+    ofstream tsurff_polar_dat("tsurff-polar"+to_string(i_proc)+".dat");    
+    tsurff_polar_dat.precision(17);
+    for (long i_k=0; i_k<num_k_proc; i_k++) {
+      const double k=k_values[i_k];
+      for (long i_theta=0; i_theta<num_theta_surff; i_theta++) {
+	const double theta=thetas_surff[i_theta];
+	const double cos_theta=cos(thetas_surff[i_theta]);
+	for (long i_phi=0; i_phi<num_phi_surff; i_phi++) {
+	  const double phi=phis_surff[i_phi];
+	  cplxd b_k(0.0, 0.0);
+	  for (long i_ell=0; i_ell<ell_grid_size-1; i_ell++) {
+	    for (long i_m=-(i_ell); i_m<(i_ell+1); i_m++) {
+	      const cplxd Ylm=Ylm_prefactor(i_m)*gsl_sf_legendre_sphPlm (i_ell, labs(i_m), cos_theta)*exp(cplxd(0.0, double(i_m)*phi));
+	      b_k+=partial_amplitude[index_ell_m_k(i_ell, i_m, i_k)]*Ylm;
+	    };
+	  };
+	  // tsurff_polar_dat << k*k*0.5 << " " << k << " " << theta << " " << phi << " " << real(b_k) << " " << imag(b_k) << endl;
+	  tsurff_polar_dat << k*k*0.5 << " " << k << " " << theta << " " << phi << " " << norm(b_k)*k << endl;
+	};
+	// line break for every new phi
+	tsurff_polar_dat << endl;
+      };
+    };
+  };
+};
+
+#endif

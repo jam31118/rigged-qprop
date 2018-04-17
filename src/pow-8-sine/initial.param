@@ -1,0 +1,17 @@
+# a Coulomb potential with a cutoff is used
+nuclear-charge double 1.0
+pot-cutoff double 25.0
+# radial grid spacing
+delta-r double 0.2
+radial-grid-size double 100.0
+# maximum number of ells in the expansion of the initial wave function
+ell-grid-size long 1
+# qprop-dim=34 for linear polarization and fixed m; qprop-dim=44 for polarization in xy-plane
+qprop-dim long 34
+# decide which orbital should be initialized before imaginary propagation; initial-ell >= abs(initial-m) 
+initial-m long 0
+initial-ell long 0
+# maximum number of imaginary time steps
+max-imag-ts long 128000
+# stop if wave function does not change
+wf-convergence-crit double 1e-50

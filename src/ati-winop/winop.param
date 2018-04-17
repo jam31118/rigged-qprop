@@ -1,0 +1,9 @@
+energy-max double 0.8
+energy-min double 0.0
+num-energy long 500
+num-theta long 3
+num-phi long 1
+# improve the angular resolved spectrum by  propagating longer
+extra-time-winop double 0.0
+# improve the energy resolution by using a large radial grid for the application of the window operator
+winop-radial-grid-size long 50000

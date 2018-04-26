@@ -52,8 +52,8 @@ class wavefunction
     void dump_xvector_to_file(long ngpsx,  FILE* os, int stepwidth);
     void dump_to_file_sh(grid g, FILE* os, int stepwidth);
     int  dump_to_file_sh(grid g, FILE* os, int stepwidth, int iv);
-    int dump_to_file_binary(ofstream& os, int iv);
-    int save_to_binary_file_in_chunck(grid g, ofstream& os, int iv);
+    int dump_to_file_binary(ofstream& os, int iv=1);
+    int save_to_binary_file_in_chunck(grid g, ofstream& os, int iv=1);
     void dump_expect_z(grid g, FILE* os, fluid &degeneracies, const fluid &ms);
 
 
@@ -103,6 +103,7 @@ class wavefunction
     cplxd project(grid g, grid gorig, wavefunction &orig, long zindex);
     
     int load(FILE*, int);
+    int load_from_binary(ifstream&);
 
     cplxd* end()   { return start + wf_dim;}
     const cplxd* end()   const { return start + wf_dim;}

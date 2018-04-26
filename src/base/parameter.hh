@@ -7,6 +7,7 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
+#include <exception>
 
 using std::cout;
 using std::cerr;

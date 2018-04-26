@@ -100,7 +100,8 @@ double parameterListe::getDouble(string name)  const {
   it = find_if(_param_list.begin(), _param_list.end(), mycmp); 
   if (it == _param_list.end()) {
     std::cerr << "Paramter " << name << " nicht gefunden in parameterListe::getDouble" << std::endl;
-    exit(-1);
+    throw std::exception();
+    //exit(-1);
   }
   else if (it->_type != "double") {
     std::cerr << "Falscher Typ in parameterListe::getDouble" << std::endl;
@@ -121,7 +122,8 @@ long parameterListe::getLong(string name)  const {
   if (it == _param_list.end())
     {
       std::cerr << "Paramter " << name << " nicht gefunden in parameterListe::getLong" << std::endl;
-      exit(-1);
+    throw std::exception();
+    //exit(-1);
     }
   else if (it->_type != "long")
     {
@@ -143,7 +145,8 @@ string parameterListe::getString(string name)  const {
   it = find_if(_param_list.begin(), _param_list.end(), mycmp); 
   if (it == _param_list.end()) {
     std::cerr << "Paramter " << name << "  nicht gefunden in parameterListe::getString" << std::endl;
-    exit(-1);
+    throw std::exception();
+    //exit(-1);
   }
   else if (it->_type != "string") {
     std::cerr << "Falscher Typ in parameterListe::getString" << std::endl;
@@ -163,7 +166,8 @@ bool parameterListe::getBool(string name)  const {
   it = find_if(_param_list.begin(), _param_list.end(), mycmp); 
   if (it == _param_list.end()) {
     std::cerr << "Paramter " << name << "  nicht gefunden in parameterListe::getBool" << std::endl;
-    exit(-1);
+    throw std::exception();
+    //exit(-1);
   }
   else if (it->_type != "bool") {
     std::cerr << "Falscher Typ in parameterListe::getBool" << std::endl;

@@ -294,6 +294,13 @@ int wavefunction::load(FILE* os, int iv)
   }
 }
 
+//// [TODO] Check if the ifstream is opened in binary mode
+int wavefunction::load_from_binary(ifstream& is) {
+  long size_in_byte = wf_size() * sizeof(cplxd);
+  is.read((char *)start, size_in_byte);
+  return !is.good();
+}
+
 
 wavefunction &wavefunction::operator=(const wavefunction &v)
 {

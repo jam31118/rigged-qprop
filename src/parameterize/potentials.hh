@@ -1,6 +1,8 @@
 #ifndef _VECPOT_H_
 #define _VECPOT_H_
 
+#include <iostream>
+
 // definitions of potentials
 
 double always_zero2(double t, int me) {
@@ -11,6 +13,9 @@ double always_zero5(double x, double y, double z, double t, int me) {
   return 0;
 };
 
+
+
+
 // The vector potential with sine squared envelope
 class vecpot {
   double n_c;
@@ -19,12 +24,14 @@ class vecpot {
   double E_0;
   double duration;
   double ww;
+  double start_time, end_time;
 public:
-  vecpot() {};
-  vecpot(double om, double n_cyc, double E_max, double cep) : omega(om), n_c(n_cyc), E_0(E_max), phi_cep(cep) {
+  vecpot() { duration = -1; };
+  vecpot(double om, double n_cyc, double E_max, double cep, double start_time_in = 0.0) : omega(om), n_c(n_cyc), E_0(E_max), phi_cep(cep), start_time(start_time_in) {
     duration=n_c*2*M_PI/omega;
     // angular frequency of the envelope
     ww=omega/(2.0*n_c);
+    end_time = start_time + duration;
   };
   double operator()(double time, int me) const {
     // switch of the field for propagation after the pulse
@@ -35,6 +42,12 @@ public:
       return 0;
     };
   };
+  double get_omega() { return omega; }
+  double get_E0() { return E_0; }
+  double get_num_cycles() { return n_c; }
+  double get_phase() { return phi_cep; }
+  double get_start_time() { return start_time; }
+  double get_end_time() { return end_time; }
   double get_duration() {
     return duration;
   };
@@ -129,5 +142,75 @@ public:
     };
   };
 };
+
+
+
+class superposed_vecpot {
+  private:
+  vecpot *vecpot_arr;
+  long num_of_vecpot;
+
+  public:
+  superposed_vecpot() {}
+  superposed_vecpot(vecpot *vecpot_arr_in, long num_of_vecpot_in) {
+
+    // Check input arguments
+    if (num_of_vecpot_in < 1) { 
+      std::cerr << "[ERROR] Unexpected number of vecpot: "
+        << num_of_vecpot << endl; exit(-1); }
+
+    // Assigen arguments into member variables
+    vecpot_arr = vecpot_arr_in;
+    num_of_vecpot = num_of_vecpot_in;
+  }
+
+  double operator () (double time, int me) {
+    double result = 0;
+    long vecpot_index;
+    for (vecpot_index = 0; vecpot_index < num_of_vecpot; vecpot_index++) {
+      result += vecpot_arr[vecpot_index](time, me);
+    }
+    return result;
+  }
+
+  double integral(double Time) {
+    double result = 0;
+    long vecpot_index;
+    for (vecpot_index = 0; vecpot_index < num_of_vecpot; vecpot_index++) {
+      result += vecpot_arr[vecpot_index].integral(Time);
+    }
+    return result;
+  }
+
+  double get_start_time() {
+    vecpot vp = vecpot_arr[0];
+    long vecpot_index;
+    double min_start_time = vp.get_start_time();
+    for (vecpot_index = 1; vecpot_index < num_of_vecpot; vecpot_index++) {
+      vp = vecpot_arr[vecpot_index];
+      if (min_start_time > vp.get_start_time()) { min_start_time = vp.get_start_time(); }
+    }
+    return min_start_time;
+  }
+
+  double get_end_time() {
+    vecpot vp = vecpot_arr[0];
+    long vecpot_index;
+    double max_end_time = vp.get_end_time();
+    for (vecpot_index = 1; vecpot_index < num_of_vecpot; vecpot_index++) {
+      vp = vecpot_arr[vecpot_index];
+      if (max_end_time < vp.get_end_time()) { max_end_time = vp.get_end_time(); }
+    }
+    return max_end_time;
+  }
+
+  double get_duration() { return get_end_time() - get_start_time(); }
+
+  vecpot *get_vecpot_arr() { return vecpot_arr; }
+
+  // double operator += () ...
+};
+
+
 
 #endif  // _VECPOT_H_

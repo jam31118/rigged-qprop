@@ -65,15 +65,6 @@ int main(int argc, char **argv) {
   const char *default_mode = default_mode_string.c_str();
 
 
-  // *** declare the grid for load ***
-//  const double delta_r = para_ini.getDouble("delta-r");
-//  g_load.set_dim(para_ini.getLong("qprop-dim"));
-//  g_load.set_ngps(long(para_ini.getDouble("radial-grid-size")/delta_r), 
-//      para_ini.getLong("ell-grid-size"), 1);
-//  g_load.set_delt(delta_r, 0.0, 0.0);
-//  g_load.set_offs(0, 0, 0);
-  
-  
   // *** declare the grid for propagation ***
   const double delta_r = para_ini.getDouble("delta-r");
   g_prop.set_dim(para_ini.getLong("qprop-dim"));
@@ -89,90 +80,20 @@ int main(int argc, char **argv) {
   g_prop.set_offs(0, 0, 0);
   
   
-  cout << "[ LOG ] Before constructing vecpot\n";
-
-
   // everything related to the laser
-//  vecpot *p_vecpot_x, *p_vecpot_y, *p_vecpot_z;
-  vecpot vecpot_x, vecpot_y, vecpot_z;
+//  vecpot vecpot_x, vecpot_y, vecpot_z;
+//  construct_vecpot(g_prop.dimens(), para_prop, vecpot_x, vecpot_y, vecpot_z);
+  superposed_vecpot vecpot_x, vecpot_y, vecpot_z;
   construct_vecpot(g_prop.dimens(), para_prop, vecpot_x, vecpot_y, vecpot_z);
-  
-//  struct vecpot_param vecpot_param_single;
-//
-//  cout << "[ LOG ] g_prop.dimens(): " << g_prop.dimens() << endl;
-//
-//  if (g_prop.dimens()==34) {
-//    cout << "[ LOG ] in constructing clause\n";
-//    bool vecpot_param_name_should_be_in_index_form = false;
-//    try { vecpot_param_single.omega = para_prop.getDouble("omega"); }
-//    catch (std::exception&) { vecpot_param_name_should_be_in_index_form = true; }
-//    
-//    if ( ! vecpot_param_name_should_be_in_index_form ) {
-//      cout << "[ LOG ] vecpot param names are in original form\n";
-//      try {
-//        vecpot_param_single.E0 = para_prop.getDouble("max-electric-field");
-//        vecpot_param_single.num_cycles = para_prop.getDouble("num-cycles");
-//      } catch (std::exception&) {
-//        std::cerr << "[ERROR] Missing parameter: " 
-//          << "'max-electric-field' and/or 'num-cycles'" << endl;
-//        return 1;
-//      }
-//      try { vecpot_param_single.phase = para_prop.getDouble("phase"); }
-//      catch (std::exception&) { vecpot_param_single.phase = 0.0; } // default value
-//      
-//      // Construct vecpot instances
-////      vecpot_param vp = vecpot_param_single; // aliasing for convenience
-////      vecpot_x = vecpot(vp.omega, 1.0, 0.0, 0.0);
-////      vecpot_y = vecpot(vp.omega, 1.0, 0.0, 0.0);
-////      vecpot_z = vecpot(vp.omega, vp.num_cycles, vp.E0, vp.phase);
-//    } else {
-//      cout << "[ LOG ] vecpot param names are in '-i-j' form\n";
-//      int number_of_vecpot_param_set_z = get_number_of_vecpot_param_set(para_prop, 'z');
-//      cout << "[ LOG ] number of vecpot_param set in z : "
-//        << number_of_vecpot_param_set_z << endl;
-//      if (number_of_vecpot_param_set_z != 1) {
-//        std::cerr << "[ERROR] Multi vecpot case hadn't been implemented.\n";
-//        return 1;
-//      } else {
-//        bool vp_exist = if_exist_get_vecpot_param(para_prop, 'z', 1, &vecpot_param_single);
-//        if (!vp_exist) { 
-//          std::cerr << "[ERROR] vecpot param set doesn't exist.\n"; 
-//          return 1; 
-//        }
-//      }
-//    }
-//    vecpot_param vp = vecpot_param_single; // aliasing for convenience
-//    vecpot_x = vecpot(vp.omega, 1.0, 0.0, 0.0);
-//    vecpot_y = vecpot(vp.omega, 1.0, 0.0, 0.0);
-//    vecpot_z = vecpot(vp.omega, vp.num_cycles, vp.E0, vp.phase);
-//  }
 
-//  vecpot vecpot_x = *p_vecpot_x, vecpot_y = *p_vecpot_y, vecpot_z = *p_vecpot_z;
 
-  // () find how many vecpot sets exist in parameter file
-  
-
-//  struct vecpot_param *vecpot_param_arr;
-
-//  const double omega = para_prop.getDouble("omega");
-//  double E_0     = para_prop.getDouble("max-electric-field");
-//  const double quiver_amplitude = E_0/pow2(omega);
   double I_p     = nuclear_charge*nuclear_charge / 2.0; // warn: hydrogenic energy!
-  // only A_z in this example
-//  vecpot vecpot_x(omega, 1.0, 0.0, 0.0);
-//  vecpot vecpot_y(omega, 1.0, 0.0, 0.0);
-//  vecpot vecpot_z(omega, para_prop.getDouble("num-cycles"), E_0, 0.0);
-
-
-  cout << "[ LOG ] U_p\n";
   // [TDDO] Consider removing this part or fix it in conservative perspective
-  double U_p;
-  if (g_prop.dimens()==34) { U_p = vecpot_z.get_Up(); }
-  else if (g_prop.dimens()==44) { U_p = vecpot_x.get_Up(); }
-  const double gamma_K = sqrt(I_p / 2.0 / U_p);     
+//  double U_p;
+//  if (g_prop.dimens()==34) { U_p = vecpot_z.get_Up(); }
+//  else if (g_prop.dimens()==44) { U_p = vecpot_x.get_Up(); }
+//  const double gamma_K = sqrt(I_p / 2.0 / U_p);
 
-
-  cout << "[ LOG ] before pulse_duration\n";
 
 //  This should be determined by dimension and combination of several vecpot
   double pulse_duration;
@@ -295,14 +216,15 @@ int main(int argc, char **argv) {
   fprintf(file_logfi, "duration = %15.10le\n", duration);
   // fprintf(file_logfi, "I_0      = %15.10le, W/cm^2\n", lintens);
 //  fprintf(file_logfi, "E_0      = %15.10le\n", vecpot_param_single.E0);
-  fprintf(file_logfi, "gamma_K  = %15.10le\n", gamma_K);
-  fprintf(file_logfi, "gamma_K      = %15.10le ", gamma_K);
-  if (gamma_K>1.0) {
-    fprintf(file_logfi, "(multi-photon regime)\n");
-  }
-  else {
-    fprintf(file_logfi, "(tunneling regime)\n");
-  };
+//  fprintf(file_logfi, "gamma_K  = %15.10le\n", gamma_K);
+//  fprintf(file_logfi, "gamma_K      = %15.10le ", gamma_K);
+//  if (gamma_K>1.0) {
+//    fprintf(file_logfi, "(multi-photon regime)\n");
+//  }
+//  else {
+//    fprintf(file_logfi, "(tunneling regime)\n");
+//  };
+//
   fflush(file_logfi);
   fclose(file_logfi);
 

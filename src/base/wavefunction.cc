@@ -34,7 +34,9 @@ int wavefunction::init(long lsize)
 {
    wf_dim = lsize;
    start = new cplxd[lsize];
-   for (long i = 0; i < lsize; i++) {start[i] = cplxd(0.0,0.0);}
+   cplxd *p_start, *p_start_max = start + lsize;
+   cplxd cplxd_zero = cplxd(0.0,0.0);
+   for (p_start = start; p_start < p_start_max; p_start++) {*p_start = cplxd_zero;}
    return 0;
 }
 
@@ -392,13 +394,21 @@ wavefunction operator * (const wavefunction &v, cplxd z)
   return temp *= z;
 }
 
-cplxd operator * (const wavefunction &v, const wavefunction &w )
+cplxd operator * (const wavefunction &v, const wavefunction &w)
 {
   cplxd result(0.0,0.0);
-  for(long i=0; i<v.wf_size(); i++)
-  {
-    result+=conj(v[i])*w[i];
-  }
+  const long v_size = v.wf_size(), w_size = w.wf_size();
+  const cplxd * v_start = &v[0], * w_start = &w[0];
+  if (v_size != w_size) { std::cerr << "[ERROR] Different wavefunction size: "
+    << v_size << "and " << w_size << endl; }
+  const cplxd *p_v; 
+  const cplxd *p_v_max = v_start + v_size;
+  const cplxd *p_w; 
+  const cplxd *p_w_max = w_start + w_size;
+  for (p_v = v_start, p_w = w_start; p_v < p_v_max; p_v++, p_w++) {
+    result += conj(*p_v) * (*p_w); }
+//  for(long i=0; i<v.wf_size(); i++)
+//  { result+=conj(v[i])*w[i]; }
   return result;
 }
 

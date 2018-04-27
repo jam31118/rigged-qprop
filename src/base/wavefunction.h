@@ -27,8 +27,16 @@ class wavefunction
       {
 	wf_dim  = v.wf_dim;
 	start = new cplxd[wf_dim];
-	for (long i = 0; i < wf_dim; i++)
-	  start[i] = v.start[i];
+//  const cplxd *p_start;
+//  const cplxd *p_start_max = start + wf_dim;
+//  const cplxd *v_start = &v[0];
+//  const cplxd *p_v;
+//  const cplxd *p_v_max = v_start + v.wf_size();
+//  cplxd temp;
+//  for (p_start = start, p_v = v_start; p_start < p_start_max; p_start++, p_v++) {
+//    temp = *p_v;
+//    *p_start = temp; }
+	for (long i = 0; i < wf_dim; i++) { start[i] = v.start[i]; }
       }
 
     virtual ~wavefunction() { delete [] start;}

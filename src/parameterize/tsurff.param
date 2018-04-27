@@ -1,0 +1,19 @@
+# distance to the t-SURFF boundary
+R-tsurff double 100.0
+# This determines the duration of the simulation (slowest electron to reach the t-SURFF boundary).
+p-min-tsurff double 0.125
+# largest k value in the calculated spectrum
+k-max-surff double 1.2
+# number of k values for the spectrum
+num-k-surff long 500
+# number of angles theta (\theta \in [0:\pi])
+num-theta-surff long 3
+# number of angles phi (\phi \in [0:2\pi])
+num-phi-surff long 1
+# delta-k-scheme=1: equidistant k grid discretization w.r.t momentum; delta-k-scheme=2: equidistant k grid discretization w.r.t energy
+delta-k-scheme long 2
+# how many time steps are processed at a time during evaluation of the spectrum
+cache-size-t long 512
+# expansion-scheme=2: true expansion of the spectrum in spherical harmonics
+# expansion-scheme=1: use for small number of angles and large number of ells (no partial spectra are produced)
+expansion-scheme long 2

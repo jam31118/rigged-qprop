@@ -1,3 +1,6 @@
+#ifndef _VECPOT_H_
+#define _VECPOT_H_
+
 // definitions of potentials
 
 double always_zero2(double t, int me) {
@@ -126,3 +129,5 @@ public:
     };
   };
 };
+
+#endif  // _VECPOT_H_

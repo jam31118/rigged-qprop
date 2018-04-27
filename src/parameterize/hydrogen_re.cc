@@ -16,6 +16,8 @@ typedef std::unique_ptr<cplxd[]> cplxd_ptr;
 #include <powers.hh>
 #include <tsurffSpectrum.hh>
 
+#include <vecpot.hh>
+
 // Functions, which determine potentials
 #include "potentials.hh"
 
@@ -28,163 +30,9 @@ void print_banner() {
   fprintf(stdout, " -------------------------------------------------------\n");
 };
 
-struct vecpot_param {
-  double omega, E0, num_cycles, phase;
-};
-
-void print_vecpot_param(struct vecpot_param vp) {
-    cout << "omega: " << vp.omega << endl;
-    cout << "E0: " << vp.E0 << endl;
-    cout << "num-cycles: " << vp.num_cycles << endl;
-    cout << "phase " << vp.phase << endl;
-}
-
-bool if_exist_get_vecpot_param(parameterListe& para_prop, char direction, 
-    int vecpot_index, struct vecpot_param *vp) {
-
-
-  // construct suffix for each parameter name in a form: '-i-j'
-  string suffix = string("-") + to_string(direction) 
-    + string("-") + to_string(vecpot_index);
-
-  cout << "[ LOG ] Processing vecpot param with suffix: " << suffix << endl;
-
-  bool vecpot_set_exist = true;
-
-  try {
-    vp->omega = para_prop.getDouble(string("omega")+suffix);
-    vp->E0 = para_prop.getDouble(string("max-electric-field")+suffix);
-    vp->num_cycles = para_prop.getDouble(string("num-cycles")+suffix);
-    vp->phase = para_prop.getDouble(string("phase")+suffix);
-  } catch (std::exception&) {
-    vecpot_set_exist = false;
-  }
-  
-  if (vecpot_set_exist) { print_vecpot_param(*vp); }
-
-  return vecpot_set_exist;
-}
-
-int get_number_of_vecpot_param_set(parameterListe& para_prop, char direction) {
-  cout << "[ LOG ] Getting number of vecpot param set\n";
-  int number_of_vecpot_param_set = 0;
-  struct vecpot_param buf;
-  int vecpot_param_set_index = 1;
-  while (if_exist_get_vecpot_param(para_prop, direction, vecpot_param_set_index, &buf)) {
-    number_of_vecpot_param_set++;
-    vecpot_param_set_index++;
-  }
-  return number_of_vecpot_param_set;
-}
-
-bool vecpot_param_name_is_in_original_form(parameterListe& para) {
-  bool is_in_original_form = true;
-  try { para.getDouble("omega"); }
-  catch (std::exception&) { is_in_original_form = false; }
-  return is_in_original_form;
-}
-
-int vecpot_param_with_original_param_34 ( parameterListe& para, struct vecpot_param *vp ) {
-  
-  try {
-    vp->omega = para.getDouble("omega");
-    vp->E0 = para.getDouble("max-electric-field");
-    vp->num_cycles = para.getDouble("num-cycles");
-  } catch (std::exception&) {
-    std::cerr << "[ERROR] Some vecpot potential\
-      parameters in original form is missing." << endl;
-    std::cerr << "[ERROR] Check all 'omega', 'max-electric-field', 'num-cycles' "
-      << "are in corresponding parameter file." << endl;
-    return 1;
-  }
-
-  try { vp->phase = para.getDouble("phase"); }
-  catch (std::exception&) { vp->phase = 0.0; }  // default value
-  
-  return 0;
-}
-
-int construct_vecpot_with_original_param_34 ( parameterListe& para,
-    vecpot& vecpot_x, vecpot& vecpot_y, vecpot& vecpot_z ) {
-
-  struct vecpot_param vp;
-  if (vecpot_param_with_original_param_34(para, &vp)) {
-    std::cerr << "[ERROR] Failed to construct vecpot with param set in original form.\n";
-    return 1; }
-
-  vecpot_x = vecpot(vp.omega, 1.0, 0.0, 0.0);
-  vecpot_y = vecpot(vp.omega, 1.0, 0.0, 0.0);
-  vecpot_z = vecpot(vp.omega, vp.num_cycles, vp.E0, vp.phase);
-
-  return 0;
-}
-
-
-int construct_vecpot ( long dim, parameterListe& para_prop, 
-    vecpot& vecpot_x, vecpot& vecpot_y, vecpot& vecpot_z ) {
-
-  if (dim==34) {
-    cout << "[ LOG ] in constructing clause\n";
-    
-    if ( vecpot_param_name_is_in_original_form(para_prop) ) {
-      cout << "[ LOG ] vecpot param names are in original form\n";
-      construct_vecpot_with_original_param_34(para_prop, vecpot_x, vecpot_y, vecpot_z);
-
-//    bool vecpot_param_name_should_be_in_index_form = false;
-//    try { vecpot_param_single.omega = para_prop.getDouble("omega"); }
-//    catch (std::exception&) { vecpot_param_name_should_be_in_index_form = true; }
-//    
-//    if ( ! vecpot_param_name_should_be_in_index_form ) {
-//      cout << "[ LOG ] vecpot param names are in original form\n";
-//      try {
-//        vecpot_param_single.E0 = para_prop.getDouble("max-electric-field");
-//        vecpot_param_single.num_cycles = para_prop.getDouble("num-cycles");
-//      } catch (std::exception&) {
-//        std::cerr << "[ERROR] Missing parameter: " 
-//          << "'max-electric-field' and/or 'num-cycles'" << endl;
-//        return 1;
-//      }
-//      try { vecpot_param_single.phase = para_prop.getDouble("phase"); }
-//      catch (std::exception&) { vecpot_param_single.phase = 0.0; } // default value
-      
-      // Construct vecpot instances
-//      vecpot_param vp = vecpot_param_single; // aliasing for convenience
-//      vecpot_x = vecpot(vp.omega, 1.0, 0.0, 0.0);
-//      vecpot_y = vecpot(vp.omega, 1.0, 0.0, 0.0);
-//      vecpot_z = vecpot(vp.omega, vp.num_cycles, vp.E0, vp.phase);
-
-    } else {
-      struct vecpot_param vecpot_param_single;
-      cout << "[ LOG ] vecpot param names are in '-i-j' form\n";
-      int number_of_vecpot_param_set_z = get_number_of_vecpot_param_set(para_prop, 'z');
-      cout << "[ LOG ] number of vecpot_param set in z : "
-        << number_of_vecpot_param_set_z << endl;
-      if (number_of_vecpot_param_set_z != 1) {
-        std::cerr << "[ERROR] Multi vecpot case hadn't been implemented.\n";
-        return 1;
-      } else {
-        bool vp_exist = if_exist_get_vecpot_param(para_prop, 'z', 1, &vecpot_param_single);
-        if (!vp_exist) { 
-          std::cerr << "[ERROR] vecpot param set doesn't exist.\n"; 
-          return 1; 
-        }
-      }
-      vecpot_param vp = vecpot_param_single; // aliasing for convenience
-      vecpot_x = vecpot(vp.omega, 1.0, 0.0, 0.0);
-      vecpot_y = vecpot(vp.omega, 1.0, 0.0, 0.0);
-      vecpot_z = vecpot(vp.omega, vp.num_cycles, vp.E0, vp.phase);
-    }
-  } else if (dim == 44) {
-
-  } else {
-    std::cerr << "[ERROR] Unexpected propagation mode (dimension): "
-      << dim << endl;
-  }
-}
-
 
 int main(int argc, char **argv) {
-  grid g_prop, g_load;
+  grid g_prop; // g_load;
   wavefunction staticpot, wf, wf_initial; // wf_load,
 
   print_banner();
@@ -217,23 +65,20 @@ int main(int argc, char **argv) {
   const char *default_mode = default_mode_string.c_str();
 
 
-  // input (result from imaginary propagation)
-//  string str_fname_wf_ini=string("./hydrogen_im-") 
-//    + to_string(my_m_quantum_num) + string("-wf_fin.dat");
-//  FILE* file_wf_ini = fopen_with_check(str_fname_wf_ini, "r");
-  
   // *** declare the grid for load ***
-  const double delta_r = para_ini.getDouble("delta-r");
-  g_load.set_dim(para_ini.getLong("qprop-dim"));
-  g_load.set_ngps(long(para_ini.getDouble("radial-grid-size")/delta_r), 
-      para_ini.getLong("ell-grid-size"), 1);
-  g_load.set_delt(delta_r, 0.0, 0.0);
-  g_load.set_offs(0, 0, 0);
+//  const double delta_r = para_ini.getDouble("delta-r");
+//  g_load.set_dim(para_ini.getLong("qprop-dim"));
+//  g_load.set_ngps(long(para_ini.getDouble("radial-grid-size")/delta_r), 
+//      para_ini.getLong("ell-grid-size"), 1);
+//  g_load.set_delt(delta_r, 0.0, 0.0);
+//  g_load.set_offs(0, 0, 0);
   
   
   // *** declare the grid for propagation ***
+  const double delta_r = para_ini.getDouble("delta-r");
   g_prop.set_dim(para_ini.getLong("qprop-dim"));
   double grid_size = para_prop.getDouble("imag-width") + para_tsurff.getDouble("R-tsurff");
+  // [TODO] Add a parameter which determines radial distance between R-tsurff and imag-pot
 //  bool add_quiver_ampl;
 //  try { add_quiver_ampl = para_prop.getBool("add-quiver-amplitude-in-real-prop"); }
 //  catch (std::exception& e) { add_quiver_ampl = false; }
@@ -250,56 +95,57 @@ int main(int argc, char **argv) {
   // everything related to the laser
 //  vecpot *p_vecpot_x, *p_vecpot_y, *p_vecpot_z;
   vecpot vecpot_x, vecpot_y, vecpot_z;
+  construct_vecpot(g_prop.dimens(), para_prop, vecpot_x, vecpot_y, vecpot_z);
   
-  struct vecpot_param vecpot_param_single;
-
-  cout << "[ LOG ] g_prop.dimens(): " << g_prop.dimens() << endl;
-
-  if (g_prop.dimens()==34) {
-    cout << "[ LOG ] in constructing clause\n";
-    bool vecpot_param_name_should_be_in_index_form = false;
-    try { vecpot_param_single.omega = para_prop.getDouble("omega"); }
-    catch (std::exception&) { vecpot_param_name_should_be_in_index_form = true; }
-    
-    if ( ! vecpot_param_name_should_be_in_index_form ) {
-      cout << "[ LOG ] vecpot param names are in original form\n";
-      try {
-        vecpot_param_single.E0 = para_prop.getDouble("max-electric-field");
-        vecpot_param_single.num_cycles = para_prop.getDouble("num-cycles");
-      } catch (std::exception&) {
-        std::cerr << "[ERROR] Missing parameter: " 
-          << "'max-electric-field' and/or 'num-cycles'" << endl;
-        return 1;
-      }
-      try { vecpot_param_single.phase = para_prop.getDouble("phase"); }
-      catch (std::exception&) { vecpot_param_single.phase = 0.0; } // default value
-      
-      // Construct vecpot instances
-//      vecpot_param vp = vecpot_param_single; // aliasing for convenience
-//      vecpot_x = vecpot(vp.omega, 1.0, 0.0, 0.0);
-//      vecpot_y = vecpot(vp.omega, 1.0, 0.0, 0.0);
-//      vecpot_z = vecpot(vp.omega, vp.num_cycles, vp.E0, vp.phase);
-    } else {
-      cout << "[ LOG ] vecpot param names are in '-i-j' form\n";
-      int number_of_vecpot_param_set_z = get_number_of_vecpot_param_set(para_prop, 'z');
-      cout << "[ LOG ] number of vecpot_param set in z : "
-        << number_of_vecpot_param_set_z << endl;
-      if (number_of_vecpot_param_set_z != 1) {
-        std::cerr << "[ERROR] Multi vecpot case hadn't been implemented.\n";
-        return 1;
-      } else {
-        bool vp_exist = if_exist_get_vecpot_param(para_prop, 'z', 1, &vecpot_param_single);
-        if (!vp_exist) { 
-          std::cerr << "[ERROR] vecpot param set doesn't exist.\n"; 
-          return 1; 
-        }
-      }
-    }
-    vecpot_param vp = vecpot_param_single; // aliasing for convenience
-    vecpot_x = vecpot(vp.omega, 1.0, 0.0, 0.0);
-    vecpot_y = vecpot(vp.omega, 1.0, 0.0, 0.0);
-    vecpot_z = vecpot(vp.omega, vp.num_cycles, vp.E0, vp.phase);
-  }
+//  struct vecpot_param vecpot_param_single;
+//
+//  cout << "[ LOG ] g_prop.dimens(): " << g_prop.dimens() << endl;
+//
+//  if (g_prop.dimens()==34) {
+//    cout << "[ LOG ] in constructing clause\n";
+//    bool vecpot_param_name_should_be_in_index_form = false;
+//    try { vecpot_param_single.omega = para_prop.getDouble("omega"); }
+//    catch (std::exception&) { vecpot_param_name_should_be_in_index_form = true; }
+//    
+//    if ( ! vecpot_param_name_should_be_in_index_form ) {
+//      cout << "[ LOG ] vecpot param names are in original form\n";
+//      try {
+//        vecpot_param_single.E0 = para_prop.getDouble("max-electric-field");
+//        vecpot_param_single.num_cycles = para_prop.getDouble("num-cycles");
+//      } catch (std::exception&) {
+//        std::cerr << "[ERROR] Missing parameter: " 
+//          << "'max-electric-field' and/or 'num-cycles'" << endl;
+//        return 1;
+//      }
+//      try { vecpot_param_single.phase = para_prop.getDouble("phase"); }
+//      catch (std::exception&) { vecpot_param_single.phase = 0.0; } // default value
+//      
+//      // Construct vecpot instances
+////      vecpot_param vp = vecpot_param_single; // aliasing for convenience
+////      vecpot_x = vecpot(vp.omega, 1.0, 0.0, 0.0);
+////      vecpot_y = vecpot(vp.omega, 1.0, 0.0, 0.0);
+////      vecpot_z = vecpot(vp.omega, vp.num_cycles, vp.E0, vp.phase);
+//    } else {
+//      cout << "[ LOG ] vecpot param names are in '-i-j' form\n";
+//      int number_of_vecpot_param_set_z = get_number_of_vecpot_param_set(para_prop, 'z');
+//      cout << "[ LOG ] number of vecpot_param set in z : "
+//        << number_of_vecpot_param_set_z << endl;
+//      if (number_of_vecpot_param_set_z != 1) {
+//        std::cerr << "[ERROR] Multi vecpot case hadn't been implemented.\n";
+//        return 1;
+//      } else {
+//        bool vp_exist = if_exist_get_vecpot_param(para_prop, 'z', 1, &vecpot_param_single);
+//        if (!vp_exist) { 
+//          std::cerr << "[ERROR] vecpot param set doesn't exist.\n"; 
+//          return 1; 
+//        }
+//      }
+//    }
+//    vecpot_param vp = vecpot_param_single; // aliasing for convenience
+//    vecpot_x = vecpot(vp.omega, 1.0, 0.0, 0.0);
+//    vecpot_y = vecpot(vp.omega, 1.0, 0.0, 0.0);
+//    vecpot_z = vecpot(vp.omega, vp.num_cycles, vp.E0, vp.phase);
+//  }
 
 //  vecpot vecpot_x = *p_vecpot_x, vecpot_y = *p_vecpot_y, vecpot_z = *p_vecpot_z;
 
@@ -442,13 +288,13 @@ int main(int argc, char **argv) {
   fprintf(file_logfi, "str_fname_obser  = %s\n", str_fname_obser.c_str());
   if (isave_wf==1) 
     fprintf(file_logfi, "str_fname_wf = %s\n", str_fname_wf.c_str());
-  fprintf(file_logfi, "n_c        = %lf\n", vecpot_param_single.num_cycles);  
+//  fprintf(file_logfi, "n_c        = %lf\n", vecpot_param_single.num_cycles);  
   // fprintf(file_logfi, "n_r        = %lf\n", n_r);
-  fprintf(file_logfi, "omega        = %15.10le\n", vecpot_param_single.omega);
+//  fprintf(file_logfi, "omega        = %15.10le\n", vecpot_param_single.omega);
   // fprintf(file_logfi, "phi_cep      = %15.10le\n", phi_cep);
   fprintf(file_logfi, "duration = %15.10le\n", duration);
   // fprintf(file_logfi, "I_0      = %15.10le, W/cm^2\n", lintens);
-  fprintf(file_logfi, "E_0      = %15.10le\n", vecpot_param_single.E0);
+//  fprintf(file_logfi, "E_0      = %15.10le\n", vecpot_param_single.E0);
   fprintf(file_logfi, "gamma_K  = %15.10le\n", gamma_K);
   fprintf(file_logfi, "gamma_K      = %15.10le ", gamma_K);
   if (gamma_K>1.0) {

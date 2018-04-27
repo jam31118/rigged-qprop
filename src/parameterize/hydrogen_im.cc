@@ -206,14 +206,19 @@ step\n");
   grid g_prop;
   g_prop.set_dim(para_ini.getLong("qprop-dim"));
   double grid_size = para_prop.getDouble("imag-width") + para_tsurff.getDouble("R-tsurff");
-  bool add_quiver_ampl;
-  const double omega = para_prop.getDouble("omega");
-  double E_0 = para_prop.getDouble("max-electric-field");
-  const double quiver_amplitude = E_0/pow2(omega);
-  try { add_quiver_ampl = para_prop.getBool("add-quiver-amplitude-in-real-prop"); }
-  catch (std::exception& e) { add_quiver_ampl = false; }
-  cout << "add_quiver_ampl: " << add_quiver_ampl << endl;
-  if (add_quiver_ampl) { grid_size += quiver_amplitude; }
+
+  // [NOTE] It assumes there's no quiver-amplitude addition.
+  // However, it should become possible to add more space beyond R-tsurff
+  // Let's make a parameter for this.
+//  bool add_quiver_ampl;
+//  const double omega = para_prop.getDouble("omega");
+//  double E_0 = para_prop.getDouble("max-electric-field");
+//  const double quiver_amplitude = E_0/pow2(omega);
+//  try { add_quiver_ampl = para_prop.getBool("add-quiver-amplitude-in-real-prop"); }
+//  catch (std::exception& e) { add_quiver_ampl = false; }
+//  cout << "add_quiver_ampl: " << add_quiver_ampl << endl;
+//  if (add_quiver_ampl) { grid_size += quiver_amplitude; }
+  //
   g_prop.set_ngps(long(grid_size/delta_r), para_prop.getLong("ell-grid-size"), 1); 
   g_prop.set_delt(delta_r);
   g_prop.set_offs(0, 0, 0);

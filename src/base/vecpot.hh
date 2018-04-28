@@ -8,17 +8,17 @@ using std::endl;
 using std::cout;
 
 struct vecpot_param {
-  double omega, E0, num_cycles, phase;
+  double omega, E0, num_cycles, phase_pi;
 };
 
 
 
 
-void print_vecpot_param(struct vecpot_param vp) {
-    cout << "omega: " << vp.omega << endl;
-    cout << "E0: " << vp.E0 << endl;
-    cout << "num-cycles: " << vp.num_cycles << endl;
-    cout << "phase " << vp.phase << endl;
+void print_vecpot_param(struct vecpot_param vparam) {
+    cout << "omega: " << vparam.omega << endl;
+    cout << "E0: " << vparam.E0 << endl;
+    cout << "num-cycles: " << vparam.num_cycles << endl;
+    cout << "phase / pi " << vparam.phase_pi << endl;
 }
 
 bool if_exist_get_vecpot_param ( parameterListe& para_prop, char direction, 
@@ -37,7 +37,7 @@ bool if_exist_get_vecpot_param ( parameterListe& para_prop, char direction,
     vp->omega = para_prop.getDouble(string("omega")+suffix);
     vp->E0 = para_prop.getDouble(string("max-electric-field")+suffix);
     vp->num_cycles = para_prop.getDouble(string("num-cycles")+suffix);
-    vp->phase = para_prop.getDouble(string("phase")+suffix);
+    vp->phase_pi = para_prop.getDouble(string("phase-pi")+suffix);
   } catch (std::exception&) {
     vecpot_set_exist = false;
   }
@@ -80,8 +80,8 @@ int vecpot_param_with_original_param_34 ( parameterListe& para, struct vecpot_pa
     return 1;
   }
 
-  try { vp->phase = para.getDouble("phase"); }
-  catch (std::exception&) { vp->phase = 0.0; }  // default value
+  try { vp->phase_pi = para.getDouble("phase") / M_PI; }
+  catch (std::exception&) { vp->phase_pi = 0.0; }  // default value
   
   return 0;
 }
@@ -96,7 +96,7 @@ int construct_vecpot_with_original_param_34 ( parameterListe& para,
 
   vecpot_x = vecpot(vp.omega, 1.0, 0.0, 0.0);
   vecpot_y = vecpot(vp.omega, 1.0, 0.0, 0.0);
-  vecpot_z = vecpot(vp.omega, vp.num_cycles, vp.E0, vp.phase);
+  vecpot_z = vecpot(vp.omega, vp.num_cycles, vp.E0, vp.phase_pi * M_PI);
 
   return 0;
 }
@@ -119,20 +119,46 @@ int if_exist_get_superposed_vecpot(parameterListe& para, char direction,
         << " and index " << vecpot_index_in_param_name << endl;
       return 1;
     }
-    vp_arr[vecpot_index] = vecpot(vparam.omega, vparam.num_cycles, vparam.E0, vparam.phase);
+    vp_arr[vecpot_index] = vecpot(vparam.omega, vparam.num_cycles, vparam.E0, vparam.phase_pi * M_PI);
   }
   svp = superposed_vecpot(vp_arr, num_of_vecpot);
   return 0;
 }
 
 void print_vecpot(vecpot& vp, const char *tag) {
-  cout << "[ LOG ] =================================" << endl; 
+  cout << "[ LOG ] ---------------------------------" << endl; 
   cout << "[ LOG ] vecpot with tag: " << tag << endl; 
   cout << "[ LOG ] - omega = " << vp.get_omega() << endl;
   cout << "[ LOG ] - E0 = " << vp.get_E0() << endl;
   cout << "[ LOG ] - num_cycles " << vp.get_num_cycles() << endl;
   cout << "[ LOG ] - phase " << vp.get_phase() << endl;
-  cout << "[ LOG ] =================================" << endl; 
+  cout << "[ LOG ] ---------------------------------" << endl; 
+}
+
+void print_superposed_vecpot(superposed_vecpot& svp, const char *tag) {
+  long vp_index;
+  vecpot *vp_arr = svp.get_vecpot_arr();
+  cout << "[ LOG ] **********************************" << endl;
+  for (vp_index = 0; vp_index < svp.get_num_of_vecpot(); vp_index++) {
+    print_vecpot(vp_arr[vp_index], tag);
+  }
+  cout << "[ LOG ] **********************************" << endl;
+}
+
+
+
+int construct_superposed_vecpot_at_direction(parameterListe& para,
+    char direction, superposed_vecpot& svp) {
+  int number_of_vecpot_param_set = get_number_of_vecpot_param_set(para, direction);
+  int return_code = if_exist_get_superposed_vecpot(para, 
+      direction, svp, number_of_vecpot_param_set);
+  if ( return_code != 0 ) { 
+    std::cerr << "[ERROR] Failed to get vecpot for direction "
+        << direction << " and number of vecpot " 
+        << number_of_vecpot_param_set << endl;
+    return 1;
+  }
+  return 0;
 }
 
 
@@ -142,7 +168,7 @@ int construct_vecpot ( long dim, parameterListe& para_prop,
     superposed_vecpot& vecpot_x, superposed_vecpot& vecpot_y, superposed_vecpot& vecpot_z ) {
 
   if (dim==34) {
-    char direction = 'z';
+    //char direction = 'z';
     cout << "[ LOG ] in constructing clause\n";
     
     if ( vecpot_param_name_is_in_original_form(para_prop) ) {
@@ -163,44 +189,43 @@ int construct_vecpot ( long dim, parameterListe& para_prop,
 
       struct vecpot_param vecpot_param_single;
 
-      int number_of_vecpot_param_set_z = get_number_of_vecpot_param_set(para_prop, 'z');
-      cout << "[ LOG ] number of vecpot_param set in z : "
-        << number_of_vecpot_param_set_z << endl;
       vecpot *vpx = new vecpot(0.1, 1.0, 0.0, 0.0);
       vecpot_x = superposed_vecpot(vpx, 1);
       vecpot *vpy = new vecpot(0.1, 1.0, 0.0, 0.0);
       vecpot_y = superposed_vecpot(vpy, 1);
+      
       // get vecpot_z
-      int return_code = 1;
-      return_code = if_exist_get_superposed_vecpot(para_prop, direction, 
-          vecpot_z,number_of_vecpot_param_set_z);
-      if ( return_code != 0 ) { std::cerr << "[ERROR] Failed to get vecpot for direction "
-        << direction << " and number of vecpot " << number_of_vecpot_param_set_z << endl;
-      }
-      
-      
-//      if (number_of_vecpot_param_set_z != 1) {
-//        std::cerr << "[ERROR] Multi vecpot case hadn't been implemented.\n";
-//        return 1;
-//      } else {
-//        bool vp_exist = if_exist_get_vecpot_param(para_prop, 'z', 1, &vecpot_param_single);
-//        if (!vp_exist) { 
-//          std::cerr << "[ERROR] vecpot param set doesn't exist.\n"; 
-//          return 1; }
+      if ( construct_superposed_vecpot_at_direction(
+            para_prop, 'z', vecpot_z) ) { return 1; }
+
+//      int number_of_vecpot_param_set_z = get_number_of_vecpot_param_set(para_prop, 'z');
+//      cout << "[ LOG ] number of vecpot_param set in z : "
+//        << number_of_vecpot_param_set_z << endl;
+//      int return_code = 1;
+//      return_code = if_exist_get_superposed_vecpot(para_prop, direction, 
+//          vecpot_z,number_of_vecpot_param_set_z);
+//      if ( return_code != 0 ) { std::cerr << "[ERROR] Failed to get vecpot for direction "
+//        << direction << " and number of vecpot " << number_of_vecpot_param_set_z << endl;
 //      }
-//
-//      vecpot_param vp = vecpot_param_single; // aliasing for convenience
-//      vecpot_x = vecpot(vp.omega, 1.0, 0.0, 0.0);
-//      vecpot_y = vecpot(vp.omega, 1.0, 0.0, 0.0);
-//      vecpot_z = vecpot(vp.omega, vp.num_cycles, vp.E0, vp.phase);
+      
     }
 
   }
 
   else if (dim == 44) {
-
+    // get vecpot_x
+    if ( construct_superposed_vecpot_at_direction(
+          para_prop, 'x', vecpot_x) ) { return 1; }
+    // get vecpot_y
+    if ( construct_superposed_vecpot_at_direction(
+          para_prop, 'y', vecpot_y) ) { return 1; }
+    // get vecpot_z
+    vecpot *vpz = new vecpot(0.1, 1.0, 0.0, 0.0);
+    vecpot_z = superposed_vecpot(vpz, 1);
+    
   } else {
     std::cerr << "[ERROR] Unexpected propagation mode (dimension): "
       << dim << endl;
   }
 }
+

@@ -20,22 +20,20 @@ int main(int argc, char **argv) {
   parameterListe para_prop("propagate.param");
   parameterListe para_tsurff("tsurff.param");
 
+  long dimens = para_ini.getLong("qprop-dim");
+
   superposed_vecpot vecpot_x, vecpot_y, vecpot_z;
-  construct_vecpot(para_ini.getLong("qprop-dim"), para_prop, vecpot_x, vecpot_y, vecpot_z);
+  construct_vecpot(dimens, para_prop, vecpot_x, vecpot_y, vecpot_z);
 
-//  const double n_cyc=para_prop.getDouble("num-cycles");
-//  vecpot vecpot_x(para_prop.getDouble("omega"), n_cyc, 0.0, 0.0);
-//  vecpot vecpot_y(para_prop.getDouble("omega"), n_cyc, 0.0, 0.0);
-//  vecpot vecpot_z(para_prop.getDouble("omega"), n_cyc, para_prop.getDouble("max-electric-field"), 0.0);
-
-  
-  // [NOTE] This should be modified to use other type, other than vecpot -> superposed_vecpot etc.
-//  tsurffSpectrum<vecpot, vecpot, vecpot> tsurff(para_ini, para_prop, para_tsurff,
-//      vecpot_x, vecpot_y, vecpot_z);
-  print_vecpot(vecpot_x.get_vecpot_arr()[0], "in tsurff, vecpot_x");
-  print_vecpot(vecpot_z.get_vecpot_arr()[0], "in tsurff, vecpot_z");
-  
-  cout << "vpz duration: " << vecpot_z.get_duration() << endl;  
+  if ( dimens == 34 ) {
+    print_superposed_vecpot(vecpot_z, "superposed_vecpot_z");
+    cout << "vecpot_z duration: " << vecpot_z.get_duration() << endl;
+  } else if ( dimens == 44 ) {
+    print_superposed_vecpot(vecpot_x, "superposed_vecpot_x");
+    cout << "vecpot_x duration: " << vecpot_x.get_duration() << endl;
+    print_superposed_vecpot(vecpot_y, "superposed_vecpot_y");
+    cout << "vecpot_y duration: " << vecpot_y.get_duration() << endl;
+  }
 
   tsurffSpectrum<superposed_vecpot, superposed_vecpot, superposed_vecpot>
     tsurff(para_ini, para_prop, para_tsurff, vecpot_x, vecpot_y, vecpot_z);

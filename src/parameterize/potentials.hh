@@ -14,8 +14,6 @@ double always_zero5(double x, double y, double z, double t, int me) {
 };
 
 
-
-
 // The vector potential with sine squared envelope
 class vecpot {
   double n_c;
@@ -102,23 +100,56 @@ public:
   };
 };                                                                                   
 
+
+
+//class scalarpot {
+//  double nuclear_charge;
+//  double R_co;
+//public:
+//  scalarpot(double charge, double co) : nuclear_charge(charge), R_co(co) {
+//    //
+//  };
+//  double operator()(double x, double y, double z, double time, int me) const {
+//    // scrinzi potential
+//    // double result=(x<R_co)?nuclear_charge*(-1.0/x-pow2(x)/(2*pow3(R_co))+3.0/(2.0*R_co)):0.0;
+//    // stupid simple Volker potential; first -1/r then linear then zero
+//    const double m=1.0/pow2(R_co);
+//    double result=(x<R_co)?-1.0/x:((x<2*R_co)?-1.0/R_co+m*(x-R_co):0.0);
+//    return result;
+//  };
+//  double get_nuclear_charge() {return nuclear_charge; };
+//};
+
+
+// class scalarpot_alpha : public scalarpot {
 class scalarpot {
+
+  private:
   double nuclear_charge;
   double R_co;
-public:
-  scalarpot(double charge, double co) : nuclear_charge(charge), R_co(co) {
-    //
-  };
-  double operator()(double x, double y, double z, double time, int me) const {
-    // scrinzi potential
-    // double result=(x<R_co)?nuclear_charge*(-1.0/x-pow2(x)/(2*pow3(R_co))+3.0/(2.0*R_co)):0.0;
-    // stupid simple Volker potential; first -1/r then linear then zero
-    const double m=1.0/pow2(R_co);
-    double result=(x<R_co)?-1.0/x:((x<2*R_co)?-1.0/R_co+m*(x-R_co):0.0);
+  double alpha;
+
+  public:
+  scalarpot(double charge, double co, double alpha_in) : 
+    nuclear_charge(charge), R_co(co), alpha(alpha_in) {}
+
+  double get_nuclear_charge() { return nuclear_charge; };
+
+  double operator () (double x, double y, double z, double time, int me) const {
+		double Z = nuclear_charge;
+    double result = 0;
+		double result0 = - (1 + exp(-alpha*R_co) * (Z - 1)) / R_co;
+    if (x < R_co) {
+			result = - (1 + exp(-alpha*x) * (Z - 1)) / x;
+    } else if (x < 2*R_co) {
+      result = - (x - R_co) / (R_co)*result0 + result0;
+    } else {
+      result = 0;
+    }
     return result;
-  };
-  double get_nuclear_charge() {return nuclear_charge; };
+  }
 };
+
 
 class imagpot {
   long imag_potential_width;
@@ -142,7 +173,6 @@ public:
     };
   };
 };
-
 
 
 class superposed_vecpot {
@@ -205,6 +235,7 @@ class superposed_vecpot {
   }
 
   double get_duration() { return get_end_time() - get_start_time(); }
+  long get_num_of_vecpot() { return num_of_vecpot; }
 
   vecpot *get_vecpot_arr() { return vecpot_arr; }
 

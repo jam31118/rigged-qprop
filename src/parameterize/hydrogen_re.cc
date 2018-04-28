@@ -37,7 +37,6 @@ int main(int argc, char **argv) {
 
   print_banner();
   
-  
   int isave_wf      = 1; // 1 -- save or 0 -- don't save wavefunctions
   int iv            = 1; // verbosity of stdout
 
@@ -80,12 +79,18 @@ int main(int argc, char **argv) {
   g_prop.set_offs(0, 0, 0);
   
   
-  // everything related to the laser
-//  vecpot vecpot_x, vecpot_y, vecpot_z;
-//  construct_vecpot(g_prop.dimens(), para_prop, vecpot_x, vecpot_y, vecpot_z);
+  // Construct Vector potential objects
   superposed_vecpot vecpot_x, vecpot_y, vecpot_z;
   construct_vecpot(g_prop.dimens(), para_prop, vecpot_x, vecpot_y, vecpot_z);
 
+
+  // Confirm whether the vecpot object had been generated well.
+  if ( g_prop.dimens() == 34 ) {
+    print_superposed_vecpot(vecpot_z, "superposed_vecpot_z");
+  } else if ( g_prop.dimens() == 44 ) {
+    print_superposed_vecpot(vecpot_x, "superposed_vecpot_x");
+    print_superposed_vecpot(vecpot_y, "superposed_vecpot_y");
+  }
 
   double I_p     = nuclear_charge*nuclear_charge / 2.0; // warn: hydrogenic energy!
   // [TDDO] Consider removing this part or fix it in conservative perspective
@@ -97,8 +102,21 @@ int main(int argc, char **argv) {
 
 //  This should be determined by dimension and combination of several vecpot
   double pulse_duration;
-  if (g_prop.dimens()==34) { pulse_duration = vecpot_z.get_duration(); }
-  else if (g_prop.dimens()==44) { std::cerr << "[ERROR] Not implemented: pulse duration for 44 mode\n"; }
+  if (g_prop.dimens()==34) { 
+    if ( vecpot_z.get_start_time() != 0 ) { std::cerr << "[ERROR] global time should be zero\n"; }
+    pulse_duration = vecpot_z.get_duration(); 
+  }
+  else if (g_prop.dimens()==44) {
+    if ( ( vecpot_x.get_start_time() != 0 ) || ( vecpot_y.get_start_time() < 0 ) ) { 
+      std::cerr << "[ERROR] global start time should should be zero\n";
+    }
+    double pulse_duration_x = vecpot_x.get_duration();
+    double pulse_duration_y = vecpot_y.get_duration();
+    if (pulse_duration_x > pulse_duration_y) { pulse_duration = pulse_duration_x; }
+    else { pulse_duration = pulse_duration_y; }
+    //std::cerr << "[ERROR] Not implemented: pulse duration for 44 mode\n"; 
+    //return 1; 
+  }
 
   // how long do the slowest electrons have time to reach the t-SURFF boundary
   const double time_surff=para_tsurff.getDouble("R-tsurff")/para_tsurff.getDouble("p-min-tsurff");
@@ -130,7 +148,12 @@ int main(int argc, char **argv) {
   const long imag_potential_width=long(para_prop.getDouble("imag-width")/delta_r);
   imagpot imaginarypot(imag_potential_width);
   // set the binding potential and the hamiltonian
-  scalarpot scalarpotx(nuclear_charge, para_ini.getDouble("pot-cutoff"));
+  double alpha;
+  try { alpha = para_ini.getDouble("effpot-alpha"); }
+  catch (std::exception&) { alpha = 0.0; } // default value - if alpha = 0.0 means no effective potential but just become coulumb potential.
+  scalarpot scalarpotx(para_ini.getDouble("nuclear-charge"), para_ini.getDouble("pot-cutoff"), alpha);
+// scalarpot scalarpotx(nuclear_charge, para_ini.getDouble("pot-cutoff"));
+
   hamop hamilton;
   hamilton.init(g_prop, vecpot_x, vecpot_y, vecpot_z, scalarpotx, always_zero5, always_zero5, imaginarypot, always_zero2);
 

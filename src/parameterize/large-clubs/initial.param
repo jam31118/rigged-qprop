@@ -1,0 +1,9 @@
+nuclear-charge double 1.0
+pot-cutoff double 100.0
+delta-r double 0.2
+# delta-r double 0.15
+radial-grid-size double 100.0
+ell-grid-size long 1
+qprop-dim long 34
+initial-m long 0
+initial-ell long 0

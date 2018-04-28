@@ -45,18 +45,18 @@ initial_guess = 0.8
 
 fargs = (Ip, imag_prop_bin)
 from scipy.optimize import fsolve
-#alpha_at_zero = fsolve(get_energy, initial_guess, args=fargs)
-#print("alpha_at_zero: {0}".format(alpha_at_zero))
+alpha_at_zero = fsolve(get_energy, initial_guess, args=fargs)
+print("alpha_at_zero: {0}".format(alpha_at_zero))
 
 
 ## generate global values
-import numpy as np
-alpha_array = np.linspace(0,4,200)
-energy_array = np.empty_like(alpha_array)
-for idx, alpha in enumerate(alpha_array):
-    energy_array[idx] = get_energy(alpha, *fargs)
-np.savetxt('alpha-array.txt',alpha_array)
-np.savetxt('energy-array.txt',energy_array)
+#import numpy as np
+#alpha_array = np.linspace(0,4,200)
+#energy_array = np.empty_like(alpha_array)
+#for idx, alpha in enumerate(alpha_array):
+#    energy_array[idx] = get_energy(alpha, *fargs)
+#np.savetxt('alpha-array.txt',alpha_array)
+#np.savetxt('energy-array.txt',energy_array)
 
 
 ## [TODO] From name of species e.g. 'xe' to set of parameters such as nuclear-charge, etc.

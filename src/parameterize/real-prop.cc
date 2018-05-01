@@ -237,17 +237,6 @@ int main(int argc, char **argv) {
 //  fprintf(file_logfi, "omega        = %15.10le\n", vecpot_param_single.omega);
   // fprintf(file_logfi, "phi_cep      = %15.10le\n", phi_cep);
   fprintf(file_logfi, "duration = %15.10le\n", duration);
-  // fprintf(file_logfi, "I_0      = %15.10le, W/cm^2\n", lintens);
-//  fprintf(file_logfi, "E_0      = %15.10le\n", vecpot_param_single.E0);
-//  fprintf(file_logfi, "gamma_K  = %15.10le\n", gamma_K);
-//  fprintf(file_logfi, "gamma_K      = %15.10le ", gamma_K);
-//  if (gamma_K>1.0) {
-//    fprintf(file_logfi, "(multi-photon regime)\n");
-//  }
-//  else {
-//    fprintf(file_logfi, "(tunneling regime)\n");
-//  };
-//
   fflush(file_logfi);
   fclose(file_logfi);
 
@@ -256,18 +245,46 @@ int main(int argc, char **argv) {
 
 
   // write vector potential to file
-  string str_fname_vpot_z;
+  string str_fname_vpot;
   if (start_time_index == 0) {
-    str_fname_vpot_z=common_prefix+string("-vpot_z.dat");
-    FILE* file_vpot_z = fopen_with_check(str_fname_vpot_z, "w");
-    for (long ts=0; ts<lno_of_ts; ts++) {
-      const double time=real_timestep*double(ts);
-      if (ts%ldumpwidth==0)
-        fprintf(file_vpot_z, "%15.10le %15.10le\n", time, vecpot_z(time, me));
-    };
-    fclose(file_vpot_z);
+    str_fname_vpot = common_prefix+string("-vecpot.dat");
+    FILE* file_vpot = fopen_with_check(str_fname_vpot, "w");
+    double time = 0.0;
+    if (g_prop.dimens() == 34) {
+      for (long ts=0; ts<lno_of_ts; ts++) {
+        if (ts%ldumpwidth==0)
+          { fprintf(file_vpot, "%15.10le %15.10le\n", 
+              time, vecpot_z(time, me)); }
+        time += real_timestep;
+      }
+    } else if (g_prop.dimens() == 44) {
+      for (long ts=0; ts<lno_of_ts; ts++) {
+        if (ts%ldumpwidth==0)
+          { fprintf(file_vpot, "%15.10le %15.10le %15.10le\n", 
+              time, vecpot_x(time, me), vecpot_y(time, me)); }
+        time += real_timestep;
+      }
+    } else { 
+      std::cerr << "[ERROR] Unexpected grid dimension: " << g_prop.dimens() << endl;
+      return 1; 
+    }
+    fclose(file_vpot);
   }
 
+
+  // Configure saving wavefunction
+  string current_wf_bin_file_name = string("current-wf.bin");
+
+
+  // Configure Backup
+  long wf_backup_period_temp;
+  try { wf_backup_period_temp = para_ini.getLong("wf-backup-period"); }
+  catch (std::exception&) { wf_backup_period_temp = 2000; } // default values
+  if (wf_backup_period_temp < 0) { 
+    std::cerr << "[ERROR] wavefunction backup period should be positive integer.\n"
+      << "[ LOG ] Input backup period = " << wf_backup_period_temp << endl;
+    return 1; }
+  const long wf_backup_period = wf_backup_period_temp;
   
 
   // ********************************************************
@@ -323,6 +340,15 @@ int main(int argc, char **argv) {
     if (ts%(ldumpwidth*10)==0) {
       cout << "timestep " << ts << " of " << lno_of_ts << ", Norm of wave function: " << N << endl;
     };
+    if (ts % (wf_backup_period) == 0) {
+      std::ofstream current_wf_bin_file(current_wf_bin_file_name, std::ios::binary);
+      if (wf.dump_to_file_binary(current_wf_bin_file)) {
+        std::cerr << "[ERROR] Failed to save wavefunction to " << current_wf_bin_file_name << endl;
+        return 1; }
+      current_wf_bin_file.close();
+      cout << "[ LOG ] Wavefunction have been saved to " << current_wf_bin_file_name 
+        << " at timestep " << ts << " of " << lno_of_ts << endl;
+    }
   }; // end of real-time-propagation loop
 #ifdef HAVE_BOOST
     cout << "time step took " << tim.elapsed() << " seconds" << endl;
@@ -341,7 +367,7 @@ int main(int argc, char **argv) {
 
 
   //// For split-step calculation
-  string current_wf_bin_file_name = string("current-wf.bin");
+//  string current_wf_bin_file_name = string("current-wf.bin");  // defined above
   std::ofstream current_wf_bin_file(current_wf_bin_file_name, std::ios::binary);
   wf.dump_to_file_binary(current_wf_bin_file);
   current_wf_bin_file.close();
@@ -354,7 +380,7 @@ int main(int argc, char **argv) {
     fprintf(stdout, "%s is written.\n", str_fname_obser.c_str());
     fprintf(stdout, "%s is written.\n", str_fname_wf.c_str());
     if (start_time_index == 0) {
-      fprintf(stdout, "%s is written.\n", str_fname_vpot_z.c_str()); }
+      fprintf(stdout, "%s is written.\n", str_fname_vpot.c_str()); }
     fprintf(stdout, "%s is written.\n", str_fname_logfi.c_str());
     fprintf(stdout, "%s is written.\n", str_fname_yield.c_str());
     fprintf(stdout, "Hasta la vista...\n");

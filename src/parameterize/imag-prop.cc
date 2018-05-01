@@ -191,7 +191,11 @@ int main(int argc, char **argv) {
 
   // Number of imaginary time steps
   const double acc_tol = 1.0e-14;  // [NOTE] Global config
-  const long lno_of_ts = 200000;  // [NOTE] Global config -- maximum number of timesteps
+
+  long max_num_of_timesteps_temp;
+  try { max_num_of_timesteps_temp = para_ini.getLong("max-num-of-imag-timesteps"); }
+  catch (std::exception&) { max_num_of_timesteps_temp = 200000; }
+  const long lno_of_ts = max_num_of_timesteps_temp;  // [NOTE] Global config -- maximum number of timesteps
   fluid ell_init, m_init;
   ell_init.init(g.ngps_z());
   m_init.init(g.ngps_z());

@@ -2,9 +2,19 @@ import subprocess as sp
 from qprop.parameter import update_param_in_file
 
 from os.path import isfile
+from sys import argv, stderr
 
-imag_prop_bin = './hydrogen_im'
+if len(argv) != 3:
+    print("[ERROR] Enter (1) imaginary propagation binary " 
+            + "/ (2) first ioniation potential in atomic unit", file=stderr)
+    exit(1)
+# imag_prop_bin = './hydrogen_im'
+imag_prop_bin = argv[1]
 assert isfile(imag_prop_bin)
+Ip = float(argv[2])
+
+
+#exit(1)
 
 def get_energy(effpot_alpha, Ip, imag_prop_bin, energy_filepath='initial-energy.dat'):
     assert isfile(imag_prop_bin)
@@ -20,7 +30,7 @@ def get_energy(effpot_alpha, Ip, imag_prop_bin, energy_filepath='initial-energy.
     assert isfile(energy_filepath)
     energy = read_scalar_from_file(energy_filepath)
     diff = energy - Ip
-    print("effpot_alpha: {0} / diff: {1} / energy: {2}".format(effpot_alpha, diff, energy))
+    print("effpot_alpha: {0} / diff: {1} / energy: {2}".format(effpot_alpha, diff, energy), flush=True)
     return diff
 
 
@@ -40,13 +50,14 @@ def read_scalar_from_file(filepath):
         raise IOError(err_mesg.format(filepath, len(not_empty_lines)))
     return scalar
 
-Ip = -4.4576e-01
-initial_guess = 0.8
+# Ip = -4.4576e-01
+initial_guess = 3.0
+print("Starting with initial guess {0:.4}".format(initial_guess), flush=True)
 
 fargs = (Ip, imag_prop_bin)
 from scipy.optimize import fsolve
 alpha_at_zero = fsolve(get_energy, initial_guess, args=fargs)
-print("alpha_at_zero: {0}".format(alpha_at_zero))
+print("alpha_at_zero: {0}".format(alpha_at_zero), flush=True)
 
 
 ## generate global values

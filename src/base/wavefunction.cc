@@ -1802,7 +1802,7 @@ int wavefunction::dump_to_file_binary(ofstream& os, int iv) {
   if (!os.good()) {fprintf(stderr, "File state flag is not good. Unable to write.\n"); fflush(stderr); return 1;}
   if (iv==1) {fprintf(stdout, "Saving to binary file\n"); fflush(stdout);}
   os.write((char *) start, sizeof(cplxd) * wf_size());
-  return 0;
+  return !os.good();  // return 0 (false) if everything is good.
 }
 
 

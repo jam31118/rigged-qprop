@@ -1,0 +1,10 @@
+R-tsurff double 150.0
+p-min-tsurff double 0.5
+k-max-surff double 1.5
+num-k-surff long 150
+num-theta-surff long 3
+num-phi-surff long 51
+delta-k-scheme long 1
+expansion-scheme long 1
+cache-size-t long 512
+

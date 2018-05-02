@@ -1,13 +1,14 @@
 nuclear-charge double 54.0
-pot-cutoff double 100.0
-delta-r double 0.2
+pot-cutoff double 50.0
+delta-r double 0.1
 radial-grid-size double 100.0
 ell-grid-size long 2
-qprop-dim long 34
+qprop-dim long 44
+
 initial-m long 0
 initial-ell long 1
-
 initial-n long 5
 
-effpot-alpha double 1.85427088837
+effpot-alpha double 2.40694033726
 
+# max-num-of-imag-timesteps long 5000

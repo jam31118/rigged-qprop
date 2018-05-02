@@ -1,6 +1,15 @@
 #!/bin/bash
 
-if [ -n "$1" ]; then base_dir="$1"; else base_dir=$HOME; fi
+## Check environment variables setting
+if [ ! -d "$QPROP_DEP_DIR" ]
+then
+  (>&2 echo "[ERROR] Please set \$QPROP_DEP_DIR to valid path where you want to install dependencies of QPROP")
+  exit -1
+fi
+
+
+base_dir="$QPROP_DEP_DIR"
+# if [ -n "$1" ]; then base_dir="$1"; else base_dir=$HOME; fi
 
 #base_dir=$HOME
 #if [ -n "$1" ]; then base_dir="$1"; fi
@@ -11,6 +20,8 @@ cd $base_dir
 base_dir_abs=$(pwd)
 cd $original_dir
 echo "[ LOG ] Absolute base directory: $base_dir_abs"
+
+exit 
 
 #printf "[  Q  ] Is this directory correct? [y/n] "
 #

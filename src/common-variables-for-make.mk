@@ -1,6 +1,6 @@
 optimargs=-O3 -ffast-math -march=native
 
-LIBHOME=/home/zietlow/tool/install/
+LIBHOME=/ptmp/sahn/qprop/builds/qprop-with-tsurff/prereq/tool/install/
 GSLHOME=$(LIBHOME)/gsl-2.4/
 MPIHOME=$(LIBHOME)/openmpi-1.10.7/
 BOOSTHOME=$(LIBHOME)/boost_1_65_1/

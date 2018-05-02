@@ -11,7 +11,7 @@ $(imag_bin) : libqprop.a hydrogen_im.cc
 	$(CXX) $(optimargs) -std=c++0x hydrogen_im.cc -o $@ -I. -I$(QPROP_SRC)/base -lqprop -lm -L$(QPROP_SRC)/../lib/x86_64
 
 $(real_bin) : libqprop.a hydrogen_re.cc
-	$(CXX) $(optimargs) -std=c++0x hydrogen_re.cc -o $@ -I. -I$(QPROP_SRC)/base -lqprop -lm $(gslargs) -L$(QPROP_SRC)/../lib/x86_64 $(boostargs) -DHAVE_BOOST 
+	$(CXX) $(optimargs) -std=c++0x hydrogen_re.cc -o $@ -I. -I$(QPROP_SRC)/base -lqprop -lm $(gslargs) -L$(QPROP_SRC)/../lib/x86_64 $(boostargs) #-DHAVE_BOOST 
 
 $(eval_bin) : libqprop.a eval-tsurff.cc
 	$(CXX) $(optimargs) -std=c++0x eval-tsurff.cc -o $@ -I. -I$(QPROP_SRC)/base -lqprop -lm $(gslargs) -L$(QPROP_SRC)/../lib/x86_64

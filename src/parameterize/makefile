@@ -8,6 +8,9 @@ real_bin = real-prop
 eval_bin = eval-tsurff
 eval_mpi_bin = eval-tsurff-mpi
 
+bin_list = $(imag_bin) $(real_bin) $(eval_bin) $(eval_mpi_bin)
+
+
 all: install
 
 $(imag_bin) : libqprop.a imag-prop.cc
@@ -22,7 +25,8 @@ $(eval_bin) : libqprop.a eval-tsurff.cc
 $(eval_mpi_bin) : libqprop.a eval-tsurff-mpi.cc
 	$(CXX) $(optimargs) -std=c++0x eval-tsurff-mpi.cc -o $@ -I. -I$(QPROP_SRC)/base -lqprop -lm  $(gslargs) $(mpiargs) -L$(QPROP_SRC)/../lib/x86_64
 
-install: $(imag_bin) $(real_bin) $(eval_bin) $(eval_mpi_bin)
+install: $(bin_list)
+	if [ ! -d "$(QPROP_BIN)" ]; then mkdir $(QPROP_BIN); fi
 	mv $^ $(QPROP_BIN)
 
 libqprop.a:
@@ -33,7 +37,7 @@ clean:
 	rm -f $(QPROP_SRC)/lib/x86_64/libqprop.a
 
 clean-bin:
-	cd $(QPROP_BIN) && rm -f $(imag_bin) $(real_bin) $(eval_bin) $(eval_mpi_bin)
+	if [ -d "$(QPROP_BIN)" ]; then cd $(QPROP_BIN) && rm -f $(bin_list); fi
 
 clean-data:
 	rm -f *.dat *.raw *.log *.bin

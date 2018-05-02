@@ -7,7 +7,7 @@ k-max-surff double 1.2
 # number of k values for the spectrum
 num-k-surff long 500
 # number of angles theta (\theta \in [0:\pi])
-num-theta-surff long 3
+num-theta-surff long 151
 # number of angles phi (\phi \in [0:2\pi])
 num-phi-surff long 1
 # delta-k-scheme=1: equidistant k grid discretization w.r.t momentum; delta-k-scheme=2: equidistant k grid discretization w.r.t energy

@@ -1,0 +1,24 @@
+# @ shell=/bin/bash
+#
+# Sample script for LoadLeveler
+#
+# @ error = job.err.$(jobid)
+# @ output = job.out.$(jobid)
+# @ job_type = parallel
+# @ node_usage= not_shared
+# @ node = 2
+# @ tasks_per_node = 32
+# @ resources = ConsumableCpus(1)
+# @ network.MPI = sn_all,not_shared,us
+# wall_clock_limit = 24:00:00
+# @ wall_clock_limit = 30:00
+# @ notification = complete
+# @ notify_user = $(user)@rzg.mpg.de
+# @ queue
+
+# run the program
+
+# cd /ptmp/${USER}/
+# poe /u/${USER}/myprog > prog.out
+poe /ptmp/sahn/qprop/builds/rigged-qprop/src/at-poe/eval-tsurff-mpi-poe > eval.poe.log
+

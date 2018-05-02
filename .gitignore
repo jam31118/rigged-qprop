@@ -1,6 +1,5 @@
 *.a
 *.o
-dev/
 *.txt
 *.raw
 *.dat

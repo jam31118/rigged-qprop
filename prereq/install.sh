@@ -21,8 +21,6 @@ base_dir_abs=$(pwd)
 cd $original_dir
 echo "[ LOG ] Absolute base directory: $base_dir_abs"
 
-exit 
-
 #printf "[  Q  ] Is this directory correct? [y/n] "
 #
 #read reply
@@ -73,6 +71,13 @@ make check
 make install
 make installcheck
 
+return_code="$?"
+if [ "$return_code" -ne "0" ]
+then
+  (>&2 echo "[ERROR] Failed to install GSL. Aborting . . .")
+  exit -1
+fi
+
 
 ## Install OpenMPI 1.10.7
 SRC_NAME="openmpi-1.10.7"
@@ -95,6 +100,15 @@ cd $BUILD_DIR
 $SRC_DIR/configure --prefix=$INSTALL_DIR
 make all -j4
 make install
+
+
+return_code="$?"
+if [ "$return_code" -ne "0" ]
+then
+  (>&2 echo "[ERROR] Failed to install openmpi. Aborting . . .")
+  exit -1
+fi
+
 
 
 ## Install Boost 1.65.1 ##
@@ -120,3 +134,9 @@ cd $SRC_DIR
 ./bootstrap.sh --prefix=$INSTALL_DIR --with-libraries=timer
 ./b2 install
 
+return_code="$?"
+if [ "$return_code" -ne "0" ]
+then
+  (>&2 echo "[ERROR] Failed to install boost. Aborting . . .")
+  exit -1
+fi

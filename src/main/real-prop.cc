@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
   cout << "[ LOG ] time_surff : " << time_surff << endl;
   
   // output that will be created by hydrogen_re
-  string common_prefix("hydrogen_re");
+  string common_prefix("real-prop");
   string str_fname_logfi=common_prefix+string(".log");
   FILE* file_logfi = fopen_with_check(str_fname_logfi, default_mode);
   string str_fname_yield=common_prefix+string("-yield.dat");

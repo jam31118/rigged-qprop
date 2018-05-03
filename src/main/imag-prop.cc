@@ -157,9 +157,6 @@ int main(int argc, char **argv) {
   hamop hamilton;
   wavefunction staticpot, E_i, wf;
 
-  fprintf(stdout," HYDROGEN_IM: Imaginary-time propagation for hydrogen atom\n");
-  fprintf(stdout," (C) Copyright by Bauer D and Koval P, Heidelberg (2005)\n");
-  fprintf(stdout," -------------------------------------------------------\n");
 
   parameterListe para_ini("initial.param");
   
@@ -232,17 +229,17 @@ int main(int argc, char **argv) {
   staticpot.calculate_staticpot(g, hamilton);
 
   // create some files with appropriate appendices
-  string common_prefix("hydrogen_im-");
-  string str_fname_logfi=common_prefix+to_string(my_m_quantum_num)+string(".log");
+  string common_prefix("imag-prop");  // [NOTE] should be in global config
+  string str_fname_logfi=common_prefix+string(".log");
   FILE* file_logfi = fopen_with_check(str_fname_logfi, "w");
 
-  string str_fname_obser=common_prefix+to_string(my_m_quantum_num)+string("-observ.dat");
+  string str_fname_obser=common_prefix+string("-observ.dat");
   FILE* file_obser_imag = fopen_with_check(str_fname_obser,"w");
 
-  string str_fname_wf_ini=common_prefix+to_string(my_m_quantum_num)+string("-wf_ini.dat");
+  string str_fname_wf_ini=common_prefix+string("-wf_ini.dat");
   FILE* file_wf_ini = fopen_with_check(str_fname_wf_ini,"w");
 
-  string str_fname_wf_fin=common_prefix+to_string(my_m_quantum_num)+string("-wf_fin.dat");
+  string str_fname_wf_fin=common_prefix+string("-wf_fin.dat");
   FILE* file_wf_fin = fopen_with_check(str_fname_wf_fin,"w");
 
   if (iv!=0) {

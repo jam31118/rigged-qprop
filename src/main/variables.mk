@@ -1,9 +1,9 @@
 optimargs=-O3 -ffast-math -march=native
 
 LIBHOME=$(QPROP_DEP_DIR)
-GSLHOME=$(LIBHOME)/gsl-2.4/
-MPIHOME=$(LIBHOME)/openmpi-1.10.7/
-BOOSTHOME=$(LIBHOME)/boost_1_65_1/
+GSLHOME=$(LIBHOME)/gsl/
+MPIHOME=$(LIBHOME)/openmpi/
+BOOSTHOME=$(LIBHOME)/boost/
 
 gslargs=-I$(GSLHOME)/include -L$(GSLHOME)/lib -lgsl -lgslcblas
 mpiargs=-I$(MPIHOME)/include -L$(MPIHOME)/lib -lmpi -lmpi_cxx -DHAVE_MPI

@@ -364,7 +364,11 @@ int main(int argc, char **argv) {
   // *** declare the grid for propagation ***
   grid g_prop;
   g_prop.set_dim(para_ini.getLong("qprop-dim"));
-  double grid_size = para_prop.getDouble("imag-width") + para_tsurff.getDouble("R-tsurff");
+  double beyond_R_distance_temp;
+  try { beyond_R_distance_temp = para_tsurff.getDouble("beyond-R"); }
+  catch (std::exception&) { beyond_R_distance_temp = 0.0; }
+  const double beyond_R_distance = beyond_R_distance_temp;
+  double grid_size = para_tsurff.getDouble("R-tsurff") + beyond_R_distance + para_prop.getDouble("imag-width");
 
   // [NOTE] It assumes there's no quiver-amplitude addition.
   // However, it should become possible to add more space beyond R-tsurff

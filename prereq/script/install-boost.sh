@@ -21,6 +21,7 @@ SRC_URL_PREFIX="https://dl.bintray.com/boostorg/release/1.65.1/source"
 cd $base_dir
 base_dir_abs=$(pwd)
 INSTALL_DIR="$base_dir_abs/$PROGRAM_NAME"
+if [ -d "$INSTALL_DIR" ]; then rm -rf $INSTALL_DIR/*; fi
 BUILD_DIR="$INSTALL_DIR/build"
 SRC_DOWN_DIR="$INSTALL_DIR/src"
 

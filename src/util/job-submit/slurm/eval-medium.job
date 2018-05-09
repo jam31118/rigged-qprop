@@ -1,0 +1,39 @@
+#!/bin/bash -l
+
+# Standard output and error:
+#SBATCH -o ./tjob.out.%j
+#SBATCH -e ./tjob.err.%j
+
+# Initial working directory:
+#SBATCH -D ./
+
+# Job Name :
+#SBATCH -J eval_tsurff
+
+# Queue (Partition):
+#SBATCH --partition=medium
+
+# Number of nodes and MPI tasks per node:
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=80
+
+# Enable Hyperthreading:
+#SBATCH --ntasks-per-core=2
+
+#
+# Request 88 GB of main Memory per node in Units of MB:
+#SBATCH --mem=88000
+
+#
+#SBATCH --mail-type=none
+#SBATCH --mail-user=<userid>@rzg.mpg.de
+
+# Wall clock limit:
+#SBATCH --time=24:00:00
+
+# Run the program:
+srun $QPROP_HOME/bin/eval-tsurff-mpi > eval.log
+
+# Combine tsurff-polar dat
+bash $QPROP_HOME/src/util/combine_polar_data.sh
+

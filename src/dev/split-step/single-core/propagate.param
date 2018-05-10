@@ -10,6 +10,6 @@ delta-t double 0.05
 add-quiver-amplitude-in-real-prop bool 1
 
 ## timesteps
-start-time-index long 0
-num-time-index long 1000
+start-time-index long 20000
+num-time-index long 3392
 

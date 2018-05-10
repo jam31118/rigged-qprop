@@ -67,13 +67,15 @@ int main(int argc, char **argv) {
   // *** declare the grid for propagation ***
   const double delta_r = para_ini.getDouble("delta-r");
   g_prop.set_dim(para_ini.getLong("qprop-dim"));
-  double grid_size = para_prop.getDouble("imag-width") + para_tsurff.getDouble("R-tsurff");
-  // [TODO] Add a parameter which determines radial distance between R-tsurff and imag-pot
-//  bool add_quiver_ampl;
-//  try { add_quiver_ampl = para_prop.getBool("add-quiver-amplitude-in-real-prop"); }
-//  catch (std::exception& e) { add_quiver_ampl = false; }
-//  cout << "add_quiver_ampl: " << add_quiver_ampl << endl;
-//  if (add_quiver_ampl) { grid_size += quiver_amplitude; }
+
+  // [TODO->DONE] Add a parameter which determines radial distance between R-tsurff and imag-pot
+  double beyond_R_distance_temp;
+  try { beyond_R_distance_temp = para_tsurff.getDouble("beyond-R"); }
+  catch (std::exception&) { beyond_R_distance_temp = 0.0; }
+  const double beyond_R_distance = beyond_R_distance_temp;
+  double grid_size = para_tsurff.getDouble("R-tsurff") + beyond_R_distance + para_prop.getDouble("imag-width");
+  // double grid_size = para_prop.getDouble("imag-width") + para_tsurff.getDouble("R-tsurff");
+  
   g_prop.set_ngps(long(grid_size/delta_r), para_prop.getLong("ell-grid-size"), 1); 
   g_prop.set_delt(delta_r);
   g_prop.set_offs(0, 0, 0);
@@ -125,7 +127,7 @@ int main(int argc, char **argv) {
   cout << "[ LOG ] time_surff : " << time_surff << endl;
   
   // output that will be created by hydrogen_re
-  string common_prefix("hydrogen_re");
+  string common_prefix("real-prop");
   string str_fname_logfi=common_prefix+string(".log");
   FILE* file_logfi = fopen_with_check(str_fname_logfi, default_mode);
   string str_fname_yield=common_prefix+string("-yield.dat");

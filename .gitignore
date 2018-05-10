@@ -7,3 +7,6 @@
 *.log
 bin/
 
+gsl/
+boost/
+openmpi/

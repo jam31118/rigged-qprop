@@ -26,13 +26,14 @@
 
 #
 #SBATCH --mail-type=none
-#SBATCH --mail-user=<userid>@rzg.mpg.de
+#SBATCH --mail-user=sahn@rzg.mpg.de
 
 # Wall clock limit:
 #SBATCH --time=24:00:00
 
 # Run the program:
-srun $QPROP_HOME/bin/eval-tsurff-mpi > eval.log
+mpirun -n 80 $QPROP_HOME/bin/eval-tsurff-mpi > eval.log
+#srun $QPROP_HOME/bin/eval-tsurff-mpi > eval.log
 
 # Combine tsurff-polar dat
 bash $QPROP_HOME/src/util/combine_polar_data.sh

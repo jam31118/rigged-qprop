@@ -2,7 +2,6 @@
 *.o
 *.txt
 *.raw
-*.dat
 *.bin
 *.log
 bin/

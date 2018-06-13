@@ -11,10 +11,14 @@ typedef std::unique_ptr<cplxd[]> cplxd_ptr;
 
 #include <vecpot.hh>
 
+
+#include "eval-tsurff.h"
+
+
 using std::cout;
 using std::string;
 
-int main(int argc, char **argv) {
+int eval_tsurff(int argc, char **argv) {
 
   parameterListe para_ini("initial.param");
   parameterListe para_prop("propagate.param");

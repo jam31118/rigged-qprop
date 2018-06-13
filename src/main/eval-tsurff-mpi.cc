@@ -14,10 +14,13 @@ typedef std::unique_ptr<cplxd[]> cplxd_ptr;
 
 #include <vecpot.hh>
 
+#include "eval-tsurff-mpi.h"
+
+
 using std::cout;
 using std::string;
 
-int main(int argc, char **argv) {
+int eval_tsurff_mpi(int argc, char **argv) {
 
 #ifdef HAVE_MPI
   int ierr = MPI_Init(&argc, &argv);

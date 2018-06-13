@@ -8,7 +8,7 @@ all: build
 
 build:
 	#$(PY) setup.py build_clib
-	$(PY) setup.py build_ext $(BUILD_FLAGS)
+	$(PY) setup.py build_ext $(BUILD_FLAGS) 
 
 clean:
 	$(PY) setup.py clean

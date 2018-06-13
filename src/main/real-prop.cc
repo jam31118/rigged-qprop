@@ -21,6 +21,9 @@ typedef std::unique_ptr<cplxd[]> cplxd_ptr;
 // Functions, which determine potentials
 #include "potentials.hh"
 
+#include "real-prop.h"
+
+
 using std::endl;
 using std::cout;
 
@@ -31,7 +34,7 @@ void print_banner() {
 };
 
 
-int main(int argc, char **argv) {
+int real_prop(int argc, char **argv) {
   grid g_prop; // g_load;
   wavefunction staticpot, wf, wf_initial; // wf_load,
 

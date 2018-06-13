@@ -26,7 +26,7 @@ PyMODINIT_FUNC PyInit__test(void) {
 
 // Define module methods
 static PyObject *_test_imag_prop(PyObject *self, PyObject *args) {
-	if (imag_prop() != 0) {
+	if (imag_prop(1, NULL) != 0) {
 		PyErr_SetString(PyExc_Exception, "Failed to execute imaginary propagation.");
 		return NULL;
 	}

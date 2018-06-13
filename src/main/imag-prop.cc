@@ -19,6 +19,8 @@
 
 #include "potentials.hh"
 
+#include "imag-prop.h"
+
 using std::cout;
 using std::endl;
 using std::string;
@@ -147,7 +149,7 @@ step\n");
 
 
 
-int main(int argc, char **argv) {
+int imag_prop(int argc, char **argv) {
   //
   // variables
   //

@@ -13,16 +13,28 @@ gxx_args = ["-g","-std=c++0x","-O8","-Wno-deprecated","-march=native",
         "-ffast-math","-Xlinker","-defsym","-Xlinker","MAIN__=main","-I."
         ]
 
+from os import environ
+QPROP_DEP_DIR = environ.get("QPROP_DEP_DIR")
+from os.path import isdir
+if not isdir(QPROP_DEP_DIR):
+    raise IOError("QPROP_DEP_DIR({}) could not be found".format(QPROP_DEP_DIR))
+GSL_HOME = join(QPROP_DEP_DIR, "gsl")
+
 #libqprop = ('qprop', {
 #    'sources': cc_source_filepaths,
 #    'include_dirs':['../src/base'],
 #    'extra_compile_args':[gxxoptions]}
 #    )
 
+sources_filepaths = ["./c/_test.cc"] \
+        + cc_source_filepaths \
+        + ["../src/main/potentials.cc"] \
+        + ["../src/main/imag-prop.cc", "../src/main/real-prop.cc"]
+
 ext_modules = [
     Extension( "_test",
-        ["./src/pyc/_test.cc"] + cc_source_filepaths + ["../src/main/imag-prop.cc"],
-        include_dirs=['./src/include','../src/base','../src/main'],
+        sources_filepaths,
+        include_dirs=['../src/base','../src/main', join(GSL_HOME, "include")],
         extra_compile_args=gxx_args
         )
 ]

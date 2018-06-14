@@ -2,17 +2,13 @@
 #define _VECPOT_H_
 
 #include <iostream>
+#include <cmath>
 
-// definitions of potentials
+#include "powers.hh"
+#include "grid.h"
 
-double always_zero2(double t, int me) {
-  return 0;
-};
-
-double always_zero5(double x, double y, double z, double t, int me) {
-  return 0;
-};
-
+double always_zero2(double t, int me);
+double always_zero5(double x, double y, double z, double t, int me);
 
 // The vector potential with sine squared envelope
 class vecpot {
@@ -241,7 +237,5 @@ class superposed_vecpot {
 
   // double operator += () ...
 };
-
-
 
 #endif  // _VECPOT_H_

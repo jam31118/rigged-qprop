@@ -1,7 +1,7 @@
 # distance to the t-SURFF boundary
 R-tsurff double 100.0
 # This determines the duration of the simulation (slowest electron to reach the t-SURFF boundary).
-p-min-tsurff double 0.125
+p-min-tsurff double 0.5
 # largest k value in the calculated spectrum
 k-max-surff double 1.2
 # number of k values for the spectrum

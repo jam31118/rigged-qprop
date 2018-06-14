@@ -18,3 +18,6 @@ clean:
 clean-all: clean
 	rm -f *.a
 
+clean-result:
+	rm -f *.dat *.log *.bin *.raw
+

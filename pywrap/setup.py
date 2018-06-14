@@ -29,13 +29,15 @@ GSL_HOME = join(QPROP_DEP_DIR, "gsl")
 sources_filepaths = ["./c/_test.cc"] \
         + cc_source_filepaths \
         + ["../src/main/potentials.cc"] \
-        + ["../src/main/imag-prop.cc", "../src/main/real-prop.cc"]
+        + ["../src/main/imag-prop.cc", "../src/main/real-prop.cc", "../src/main/eval-tsurff.cc"]
 
 ext_modules = [
     Extension( "_test",
         sources_filepaths,
         include_dirs=['../src/base','../src/main', join(GSL_HOME, "include")],
-        extra_compile_args=gxx_args
+        extra_compile_args=gxx_args,
+        library_dirs=[join(GSL_HOME,"lib")],
+        libraries=["gsl","gslcblas"]
         )
 ]
 

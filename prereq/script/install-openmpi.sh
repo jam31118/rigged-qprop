@@ -44,7 +44,7 @@ wget $SRC_URL
 if [ "$?" -ne "0" ]; then (>&2 echo "[ERROR] Failed to wget"); exit -1; fi
 tar xzvf $SRC_TARBALL
 cd $BUILD_DIR
-$SRC_DIR/configure --prefix=$INSTALL_DIR
+$SRC_DIR/configure --prefix=$INSTALL_DIR --enable-mpi-cxx
 make -j4
 make install
 

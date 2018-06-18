@@ -34,11 +34,20 @@ factorial.o: factorial.cc
 winop.o: winop.cc
 	g++ $(gxxoptions) -c -o $@ $<
 
+smallHelpers.o: smallHelpers.cc
+	g++ $(gxxoptions) -c -o $@ $<
+
 parameter.o: parameter.cc
 	g++ $(gxxoptions) -c -o $@ $<
 
+vecpot.o: vecpot.cc
+	g++ $(gxxoptions) -c -o $@ $<
+
+potentials.o: potentials.cc
+	g++ $(gxxoptions) -c -o $@ $<
+
 # ar rvs ---> replace files, be verbose, Write an object-file index into the archive
-libqprop.a: bar.o ylm.o wavefunction.o hamop.o grid.o fluid.o factorial.o winop.o parameter.o
+libqprop.a: bar.o ylm.o wavefunction.o hamop.o grid.o fluid.o factorial.o winop.o parameter.o smallHelpers.o vecpot.o potentials.o
 	ar rvs $@ $^
 
 clean:

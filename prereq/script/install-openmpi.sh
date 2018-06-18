@@ -14,9 +14,9 @@ else
 fi
 
 PROGRAM_NAME="openmpi"
-VERSION="-1.10.7"
+VERSION="-3.1.0"
 ARCH_EXT=".tar.gz"
-SRC_URL_PREFIX="http://www.open-mpi.de/software/ompi/v1.10/downloads"
+SRC_URL_PREFIX="https://download.open-mpi.org/release/open-mpi/v3.1"
 
 cd $base_dir
 base_dir_abs=$(pwd)

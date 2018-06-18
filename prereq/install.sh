@@ -8,6 +8,9 @@ source $(dirname "$0")/script/colors.sh
 if [ ! -d "$QPROP_HOME" ]
 then
   (>&2 echo -e "${ERROR} Please set \$QPROP_HOME to valid path where source code resides")
+  (>&2 echo -e "${LOG} Now, \$QPROP_HOME is set as: $QPROP_HOME")
+  (>&2 echo -e "${LOG} If you have set a variable but it doesn't seem to appear in this script, ")
+  (>&2 echo -e "${LOG} check if the variable has been exported using 'export' command.")
   exit -1
 fi
 
@@ -17,6 +20,22 @@ then
   exit -1
 fi
 
+
+## Check whether required source code are available
+url_gsl="http://ftp-stud.hs-esslingen.de/pub/Mirrors/ftp.gnu.org/gsl/gsl-2.4.tar.gz"
+url_openmpi="https://download.open-mpi.org/release/open-mpi/v3.1/openmpi-3.1.0.tar.gz"
+url_boost="https://dl.bintray.com/boostorg/release/1.65.1/source/boost_1_65_1.tar.gz"
+for url in $url_gsl $url_openmpi $url_boost
+do
+  wget --spider $url
+  wget_exit_code="$?"
+  if [ "$wget_exit_code" -ne "0" ]
+  then
+    (>&2 echo "${ERROR} Cannot find requested webpage: $url")
+    (>&2 echo "${ERROR} Please check if the source code in the webpage is available in the webpage")
+  else echo "${LOG} Found source code at $url"
+  fi
+done
 
 ## Prepare relavant directories
 BASE_DIR="$QPROP_DEP_DIR"

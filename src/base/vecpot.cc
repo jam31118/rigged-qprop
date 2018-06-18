@@ -3,11 +3,18 @@
 using std::endl;
 using std::cout;
 
-struct vecpot_param {
-  double omega, E0, num_cycles, phase_pi;
-};
 
-
+bool is_valid_direction(char direction) {
+    int char_index, num_of_matches = 0;
+    for (char_index=0; char_index<strlen(valid_directions); char_index++) {
+	if (direction == valid_directions[char_index]) { num_of_matches++; }
+    }
+    if ( num_of_matches == 1 ) { return true; } // there is a single matched valid direction
+    else if ( num_of_matches == 0 ) { return false; } // no matched valid direction
+    else if ( num_of_matches > 1 ) { throw "There are two or more identical characters in 'valid_directions' string"; }
+    else if ( num_of_matches < 0 ) { throw "Number of matches should not be zero."; }
+    else { throw "Unexpected case for num_of_matches"; }
+}
 
 
 void print_vecpot_param(struct vecpot_param vparam) {
@@ -20,10 +27,17 @@ void print_vecpot_param(struct vecpot_param vparam) {
 bool if_exist_get_vecpot_param ( parameterListe& para_prop, char direction, 
     int vecpot_index, struct vecpot_param *vp) {
 
-
+  if ( ! is_valid_direction(direction) ) { 
+	  fprintf(stderr, "[ LOG ] The given direction('%c') is not valid.\n", direction);
+	  fprintf(stderr, "[ LOG ] Please choose direction among the following characters: \"%s\"\n", valid_directions);
+	  throw "[ERROR] Direction is not valid!"; }
   // construct suffix for each parameter name in a form: '-i-j'
-  string suffix = string("-") + to_string(direction) 
+  string suffix = string("-") + string(1, direction)
     + string("-") + to_string(vecpot_index);
+
+//  fprintf(stderr, "[ LOG ] direction: '%c' and to_string(direction): '%s'\n", direction, to_string(direction));
+  std::cerr << "[ LOG ] direction: " << direction << " and to_string(direction): " << std::string(1, direction) << endl;
+  fprintf(stderr, "[ LOG ] Suffix for vecpot parameter: %s\n", suffix.c_str());
 
   cout << "[ LOG ] Processing vecpot param with suffix: " << suffix << endl;
 

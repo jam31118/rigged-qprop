@@ -3,10 +3,19 @@
 
 
 #include <iostream>
+#include <cstring>
+#include <string>
 
 #include <parameter.hh>
 
 #include "potentials.hh"
+
+
+struct vecpot_param {
+  double omega, E0, num_cycles, phase_pi;
+};
+
+const char valid_directions[] = "xyz";
 
 
 void print_vecpot_param(struct vecpot_param vparam);

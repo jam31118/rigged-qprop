@@ -9,6 +9,12 @@ timeOfInitiation=$(date)
 echo "[ LOG ] Time of initiation of this script: $timeOfInitiation"
 
 
+# Simulation program (binary) name list
+im_bin=./hydrogen_im
+re_bin=./hydrogen_re
+eval_bin=./eval-tsurff-mpi
+
+
 ## Parse command-line argument, overiding default configurations
 if [ -n "$1" ]; then numOfProcess="$1"; else echo "No first argument \$1, the number of process."; exit 1; fi 
 
@@ -28,10 +34,6 @@ echo "[ LOG ] Completed compilation"
 
 
 ## Basic Configuration
-# Simulation program (binary) name list
-im_bin=./hydrogen_im
-re_bin=./hydrogen_re
-eval_bin=./eval-tsurff-mpi
 
 # Parameter Files
 initialParamFile="./initial.param"

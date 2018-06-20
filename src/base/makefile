@@ -11,40 +11,40 @@ libpath = ../../lib/x86_64
 all: install
 
 bar.o: bar.cc
-	g++ $(gxxoptions) -c -o $@ $<
+	$(CXX) $(gxxoptions) -c -o $@ $<
 
 ylm.o: ylm.cc
-	g++ $(gxxoptions) -c -o $@ $<
+	$(CXX) $(gxxoptions) -c -o $@ $<
 
 wavefunction.o: wavefunction.cc
-	g++ $(gxxoptions) -c -o $@ $<
+	$(CXX) $(gxxoptions) -c -o $@ $<
 
 hamop.o: hamop.cc
-	g++ $(gxxoptions) -c -o $@ $<
+	$(CXX) $(gxxoptions) -c -o $@ $<
 
 grid.o: grid.cc
-	g++ $(gxxoptions) -c -o $@ $<
+	$(CXX) $(gxxoptions) -c -o $@ $<
 
 fluid.o: fluid.cc
-	g++ $(gxxoptions) -c -o $@ $<
+	$(CXX) $(gxxoptions) -c -o $@ $<
 
 factorial.o: factorial.cc
-	g++ $(gxxoptions) -c -o $@ $<
+	$(CXX) $(gxxoptions) -c -o $@ $<
 
 winop.o: winop.cc
-	g++ $(gxxoptions) -c -o $@ $<
+	$(CXX) $(gxxoptions) -c -o $@ $<
 
 smallHelpers.o: smallHelpers.cc
-	g++ $(gxxoptions) -c -o $@ $<
+	$(CXX) $(gxxoptions) -c -o $@ $<
 
 parameter.o: parameter.cc
-	g++ $(gxxoptions) -c -o $@ $<
+	$(CXX) $(gxxoptions) -c -o $@ $<
 
 vecpot.o: vecpot.cc
-	g++ $(gxxoptions) -c -o $@ $<
+	$(CXX) $(gxxoptions) -c -o $@ $<
 
 potentials.o: potentials.cc
-	g++ $(gxxoptions) -c -o $@ $<
+	$(CXX) $(gxxoptions) -c -o $@ $<
 
 # ar rvs ---> replace files, be verbose, Write an object-file index into the archive
 libqprop.a: bar.o ylm.o wavefunction.o hamop.o grid.o fluid.o factorial.o winop.o parameter.o smallHelpers.o vecpot.o potentials.o

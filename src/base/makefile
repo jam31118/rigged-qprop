@@ -1,7 +1,10 @@
 
 # The option -march=native may allow the compiler to use fancy instructions (SSE, AVX and the like).
 # It also means you have to recompile on each CPU architecture you are using.
-gxxoptions = -g -std=c++0x -O8 -Wno-deprecated -march=native -funroll-all-loops -finline-functions -fexpensive-optimizations -ffast-math -fPIC -Xlinker -defsym -Xlinker MAIN__=main -I.
+cpu_type = generic
+arch_flags = -mtune=$(cpu_type) #-march=$(arch)
+gxxoptions = -g -std=c++0x -O8 -Wno-deprecated $(arch_flags) -funroll-all-loops -finline-functions -fexpensive-optimizations -ffast-math -fPIC -Xlinker -defsym -Xlinker MAIN__=main -I.
+#gxxoptions = -g -std=c++0x -O8 -Wno-deprecated -march=native -funroll-all-loops -finline-functions -fexpensive-optimizations -ffast-math -fPIC -Xlinker -defsym -Xlinker MAIN__=main -I.
 libpath = ../../lib/x86_64
 
 # $@ - means the target

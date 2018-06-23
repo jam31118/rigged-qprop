@@ -9,6 +9,6 @@
 
 #SBATCH --partition=g1,g2,g3,g4
 
-srun bash $QPROP_HOME/src/util/run/imag.sh
-srun bash $QPROP_HOME/src/util/run/real.sh
+bash $QPROP_HOME/src/util/run/imag.sh
+bash $QPROP_HOME/src/util/run/real.sh
 

@@ -5,8 +5,8 @@
 
 #SBATCH --output=slurm.%x.%j.log
 
-#SBATCH --ntasks=20
-#SBATCH --nodes=2
+#SBATCH --ntasks=12
+#SBATCH --nodes=1
 
 #SBATCH --partition=g1,g2,g3,g4
 

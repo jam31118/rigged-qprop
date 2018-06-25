@@ -4,10 +4,11 @@
 *.raw
 *.bin
 *.log
+
 bin/
 
+## Avoid including dependency directories
 gsl/
 boost/
 openmpi/
-
 dep/

@@ -10,12 +10,12 @@ eval_mpi_bin = eval-tsurff-mpi
 
 bin_list = $(imag_bin) $(real_bin) $(eval_bin) $(eval_mpi_bin)
 
-MPICXX ?= g++
+MPICXX ?= $(CXX)
 
 all: install
 
 $(imag_bin) : libqprop.a imag-prop.cc imag-prop-main.cc
-	$(CXX) $(optimargs) -std=c++0x imag-prop-main.cc imag-prop.cc -o $@ -I. -I$(QPROP_SRC)/base -lqprop -lm -L$(QPROP_SRC)/../lib/x86_64
+	$(CXX) $(optimargs) -std=c++0x imag-prop-main.cc imag-prop.cc -o $@ -I. -I$(QPROP_SRC)/base -L$(QPROP_SRC)/../lib/x86_64 -lqprop -lm 
 
 $(real_bin) : libqprop.a real-prop.cc real-prop-main.cc
 	$(CXX) $(optimargs) -std=c++0x real-prop-main.cc real-prop.cc -o $@ -I. -I$(QPROP_SRC)/base -lqprop -lm $(gslargs) -L$(QPROP_SRC)/../lib/x86_64 $(boostargs) -DHAVE_BOOST 

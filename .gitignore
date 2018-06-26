@@ -12,3 +12,7 @@ gsl/
 boost/
 openmpi/
 dep/
+
+## For system-specific compilation
+make.sh.local
+

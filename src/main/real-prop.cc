@@ -1,55 +1,34 @@
-#include <iostream>
-#include <memory>
-#include <complex>
-#include <exception>
-typedef std::complex<double> cplxd;
-typedef std::unique_ptr<cplxd[]> cplxd_ptr;
-
-#include <grid.h>
-#include <hamop.h>
-#include <wavefunction.h>
-#include <parameter.hh>
-#ifdef HAVE_BOOST
-#include <boost/timer.hpp>
-#endif
-#include <smallHelpers.hh>
-#include <powers.hh>
-#include <tsurffSpectrum.hh>
-
-#include <vecpot.hh>
-
-// Functions, which determine potentials
-#include "potentials.hh"
-
 #include "real-prop.h"
-
 
 using std::endl;
 using std::cout;
 
 void print_banner() {
-  fprintf(stdout, " IONIZATION: hydrogen\n");
+  fprintf(stdout, " IONIZATION\n");
   fprintf(stdout, " (C) Copyright by Bauer D and Koval P, Heidelberg (2005)\n");
   fprintf(stdout, " -------------------------------------------------------\n");
 };
 
 
 int real_prop(int argc, char **argv) {
-  grid g_prop; // g_load;
-  wavefunction staticpot, wf, wf_initial; // wf_load,
+
+  grid g_prop;
+  wavefunction staticpot, wf, wf_initial;
 
   print_banner();
-  
-  int isave_wf      = 1; // 1 -- save or 0 -- don't save wavefunctions
-  int iv            = 1; // verbosity of stdout
 
-  // get parameters
+  // Set verbosity of stdout
+  int iv            = 1;
+
+
+  // Instantiate parameter objects from which several user-defined parameters 
+  // will be extracted and used in this prgoram
   parameterListe para_ini("initial.param");
   parameterListe para_prop("propagate.param");
   parameterListe para_tsurff("tsurff.param");
 
 
-  // Get parameters from parameter files
+  // Get some parameters from parameter files
   const int my_m_quantum_num = para_ini.getLong("initial-m");
   const double nuclear_charge = para_ini.getDouble("nuclear-charge");
 
@@ -59,6 +38,8 @@ int real_prop(int argc, char **argv) {
   
 
   // Output configuration
+  // The log files are written with this `default_mode`
+  // it is either "w" (new write; erasing previous file contents if any) or "a" (append mode)
   string default_mode_string;
   if (start_time_index == 0) { default_mode_string = string("w"); }
   else if (start_time_index > 0) { default_mode_string = string("a"); }
@@ -67,17 +48,17 @@ int real_prop(int argc, char **argv) {
   const char *default_mode = default_mode_string.c_str();
 
 
-  // *** declare the grid for propagation ***
+  // Declare and configure a grid for propagation
   const double delta_r = para_ini.getDouble("delta-r");
   g_prop.set_dim(para_ini.getLong("qprop-dim"));
 
-  // [TODO->DONE] Add a parameter which determines radial distance between R-tsurff and imag-pot
+
+  // Add a parameter which determines radial distance between R-tsurff and imag-pot
   double beyond_R_distance_temp;
   try { beyond_R_distance_temp = para_tsurff.getDouble("beyond-R"); }
   catch (std::exception&) { beyond_R_distance_temp = 0.0; }
   const double beyond_R_distance = beyond_R_distance_temp;
   double grid_size = para_tsurff.getDouble("R-tsurff") + beyond_R_distance + para_prop.getDouble("imag-width");
-  // double grid_size = para_prop.getDouble("imag-width") + para_tsurff.getDouble("R-tsurff");
   
   g_prop.set_ngps(long(grid_size/delta_r), para_prop.getLong("ell-grid-size"), 1); 
   g_prop.set_delt(delta_r);
@@ -97,39 +78,34 @@ int real_prop(int argc, char **argv) {
     print_superposed_vecpot(vecpot_y, "superposed_vecpot_y");
   }
 
-  double I_p     = nuclear_charge*nuclear_charge / 2.0; // warn: hydrogenic energy!
-  // [TDDO] Consider removing this part or fix it in conservative perspective
-//  double U_p;
-//  if (g_prop.dimens()==34) { U_p = vecpot_z.get_Up(); }
-//  else if (g_prop.dimens()==44) { U_p = vecpot_x.get_Up(); }
-//  const double gamma_K = sqrt(I_p / 2.0 / U_p);
 
-
-//  This should be determined by dimension and combination of several vecpot
+  // Determine duration of the vector potential
+  // [NOTE] This should be determined by qprop-dimension and combination of several vecpot
   double pulse_duration;
-  if (g_prop.dimens()==34) { 
+  if ( g_prop.dimens() == 34 ) { 
     if ( vecpot_z.get_start_time() != 0 ) { std::cerr << "[ERROR] global time should be zero\n"; }
     pulse_duration = vecpot_z.get_duration(); 
   }
-  else if (g_prop.dimens()==44) {
-    if ( ( vecpot_x.get_start_time() != 0 ) || ( vecpot_y.get_start_time() < 0 ) ) { 
-      std::cerr << "[ERROR] global start time should should be zero\n";
-    }
+  else if ( g_prop.dimens() == 44 ) {
+    if ( ( vecpot_x.get_start_time() != 0 ) || ( vecpot_y.get_start_time() != 0 ) ) { 
+      std::cerr << "[ERROR] global start time should should be zero\n"; }
     double pulse_duration_x = vecpot_x.get_duration();
     double pulse_duration_y = vecpot_y.get_duration();
-    if (pulse_duration_x > pulse_duration_y) { pulse_duration = pulse_duration_x; }
+    if ( pulse_duration_x > pulse_duration_y ) { pulse_duration = pulse_duration_x; }
     else { pulse_duration = pulse_duration_y; }
-    //std::cerr << "[ERROR] Not implemented: pulse duration for 44 mode\n"; 
-    //return 1; 
   }
 
-  // how long do the slowest electrons have time to reach the t-SURFF boundary
+
+  // How long do the slowest electrons have time to reach the t-SURFF boundary
+  // [NOTE] Keep in mind that the electron doesn't have a position 
+  // and there's no concept like 'reach somewhere' for the electron especially in this quantum treatment.
   const double time_surff=para_tsurff.getDouble("R-tsurff")/para_tsurff.getDouble("p-min-tsurff");
   const double duration=pulse_duration+time_surff;
   cout << "[ LOG ] pulse_duration : " << pulse_duration << endl;
   cout << "[ LOG ] time_surff : " << time_surff << endl;
   
-  // output that will be created by hydrogen_re
+  
+  // The output files that will be created by `real-prop`
   string common_prefix("real-prop");
   string str_fname_logfi=common_prefix+string(".log");
   FILE* file_logfi = fopen_with_check(str_fname_logfi, default_mode);
@@ -144,8 +120,6 @@ int real_prop(int argc, char **argv) {
   };
 
 
-  cout << "[ LOG ] Before tsurffSaveWF\n";
-
   // create an instance of the class for doing the tsurff related work
   tsurffSaveWF tsurff_save_wf(para_ini, para_prop, para_tsurff, g_prop);
 
@@ -157,34 +131,30 @@ int real_prop(int argc, char **argv) {
   try { alpha = para_ini.getDouble("effpot-alpha"); }
   catch (std::exception&) { alpha = 0.0; } // default value - if alpha = 0.0 means no effective potential but just become coulumb potential.
   scalarpot scalarpotx(para_ini.getDouble("nuclear-charge"), para_ini.getDouble("pot-cutoff"), alpha);
-// scalarpot scalarpotx(nuclear_charge, para_ini.getDouble("pot-cutoff"));
+  
 
+  // Define hamiltonian object
   hamop hamilton;
   hamilton.init(g_prop, vecpot_x, vecpot_y, vecpot_z, scalarpotx, always_zero5, always_zero5, imaginarypot, always_zero2);
+
 
   // this is the linear and constant part of the Hamiltonian
   staticpot.init(g_prop.size()); 
   staticpot.calculate_staticpot(g_prop, hamilton);
 
-  // *** wavefunction array 
+
+  // Initialize wavefunction array 
   wf.init(g_prop.size()); 
   wf_initial.init(g_prop.size());
-//  wf_load.init(g_load.size());
-  
-  // *** wavefunction initialization ***
-//  wf_load.init(g_load, file_wf_ini, 0, iv);
-//  wf.regrid(g_prop, g_load, wf_load);
-//  fclose(file_wf_ini);
-
 
 
   // Load initial wavefunction from file
-  string initial_wf_file_name = string("ini-wf.bin");
+  string initial_wf_file_name = string("ini-wf.bin"); // [NOTE] global variable
   std::ifstream initial_wf_file(initial_wf_file_name, std::ios::binary);
-  if (!initial_wf_file.is_open()) {
+  if ( !initial_wf_file.is_open() ) {
     std::cerr << "[ERROR] Failed to read file: " << initial_wf_file_name << endl;
     return 1; }
-  if (wf_initial.load_from_binary(initial_wf_file)) {
+  if ( wf_initial.load_from_binary(initial_wf_file) ) {
     std::cerr << "[ERROR] Failed to load initial wavefunction from file with name: " 
       << initial_wf_file_name << endl;
     return 1; }
@@ -233,14 +203,8 @@ int real_prop(int argc, char **argv) {
   fprintf(file_logfi, "real_timestep     = %15.10le\n", real_timestep);
   fprintf(file_logfi, "lno_of_ts         = %ld\n", lno_of_ts);
   fprintf(file_logfi, "nuclear_charge    = %15.10le\n", nuclear_charge);
-//  fprintf(file_logfi, "str_fname_wf_ini = %s\n", str_fname_wf_ini.c_str());
   fprintf(file_logfi, "str_fname_obser  = %s\n", str_fname_obser.c_str());
-  if (isave_wf==1) 
-    fprintf(file_logfi, "str_fname_wf = %s\n", str_fname_wf.c_str());
-//  fprintf(file_logfi, "n_c        = %lf\n", vecpot_param_single.num_cycles);  
-  // fprintf(file_logfi, "n_r        = %lf\n", n_r);
-//  fprintf(file_logfi, "omega        = %15.10le\n", vecpot_param_single.omega);
-  // fprintf(file_logfi, "phi_cep      = %15.10le\n", phi_cep);
+  fprintf(file_logfi, "str_fname_wf = %s\n", str_fname_wf.c_str());
   fprintf(file_logfi, "duration = %15.10le\n", duration);
   fflush(file_logfi);
   fclose(file_logfi);
@@ -328,8 +292,8 @@ int real_prop(int argc, char **argv) {
     if (ts%ldumpwidth==0) {
       // calculate total energy, projection onto initial state, norm, and <z>
       double E_tot = real(wf.energy(0.0, g_prop, hamilton, me, staticpot, nuclear_charge));
-      // since the grid of both wavefunction are same, 
-      // we can use this simple opeerator, instead of wavefunction::project() method
+      // [NOTE] since the grid of both wavefunction are same, 
+      // we can use this simple opeerator (`*`), instead of wavefunction::project() method
 //      P = wf.project(g_prop, g_load, wf_load, 0);
       P = wf_initial * wf; 
       N = wf.norm(g_prop);
@@ -370,18 +334,14 @@ int real_prop(int argc, char **argv) {
   fclose(file_wf); 
 
 
-
   //// For split-step calculation
-//  string current_wf_bin_file_name = string("current-wf.bin");  // defined above
   std::ofstream current_wf_bin_file(current_wf_bin_file_name, std::ios::binary);
   wf.dump_to_file_binary(current_wf_bin_file);
   current_wf_bin_file.close();
   ////
 
-
  
   if (iv!=0) {
-//    fprintf(stdout, "%s was read.\n",   str_fname_wf_ini.c_str());
     fprintf(stdout, "%s is written.\n", str_fname_obser.c_str());
     fprintf(stdout, "%s is written.\n", str_fname_wf.c_str());
     if (start_time_index == 0) {

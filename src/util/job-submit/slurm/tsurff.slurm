@@ -13,7 +13,7 @@
 
 ## Run tsurff
 hostname
-$QPROP_DEP_DIR/openmpi/bin/mpiexec $QPROP_HOME/bin/eval-tsurff-mpi
+$QPROP_DEP_DIR/openmpi/bin/mpiexec $QPROP_HOME/bin/eval-tsurff-mpi > eval.log 2>&1
 
 
 ## Combine partial data files produced by separate MPI processes

@@ -133,7 +133,7 @@ step\n");
 //    cout << "[ LOG ] after propataiong at time: " << time << endl;
 
 //    for (long wf_index=my_ell_quantum_num; wf_index<n-1; wf_index++) {
-    for (long wf_index=0; wf_index<n-1; wf_index++) {
+    for (long wf_index=0; wf_index<n-1-my_ell_quantum_num; wf_index++) {
       substract_component(g, *p_wf, wf_arr[wf_index]);
     }
 //    cout << "[ LOG ] after substraction at time: " << time << endl;
@@ -298,7 +298,7 @@ int imag_prop(int argc, char **argv) {
   
   wavefunction *wf_arr = new wavefunction[initial_n-my_ell_quantum_num];
   wavefunction *p_wf;
-  for (long wf_index = 0; wf_index < initial_n; wf_index++) {
+  for (long wf_index = 0; wf_index < initial_n-my_ell_quantum_num; wf_index++) {
     p_wf = &wf_arr[wf_index];
     (*p_wf).init(g.size());
     if (g.dimens()==34) { (*p_wf).init(g, iinitmode, 1.0, ell_init); } 
@@ -314,7 +314,7 @@ int imag_prop(int argc, char **argv) {
     std::cerr << "[ERROR] Failed to get " << initial_n-1 << "-th eigenstate\n";
     return 1;
   }
-  wf = wf_arr[initial_n-1];
+  wf = wf_arr[initial_n-1-my_ell_quantum_num];
 
 
 //  // printf("Press any key to finish imaginary-time propagation...\n");

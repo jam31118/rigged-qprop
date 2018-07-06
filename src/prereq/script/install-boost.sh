@@ -1,5 +1,8 @@
 #!/bin/bash
 
+## Source required scripts
+source $(dirname "$0")/script/colors.sh
+
 base_dir=""
 if [ -n "$1" ]
 then
@@ -40,8 +43,19 @@ echo "SRC_DIR: $SRC_DIR"
 echo "BUILD_DIR: $BUILD_DIR"
 
 cd $SRC_DOWN_DIR
-wget $SRC_URL
-if [ "$?" -ne "0" ]; then (>&2 echo "[ERROR] Failed to wget"); exit -1; fi
+# [NOTE] The `-O` option is to avoid 'File name too long' error from wget
+wget -O $SRC_TARBALL $SRC_URL
+if [ "$?" -ne "0" ]
+then
+  (>&2 echo "${ERROR} Failed to wget during downloading '$SRC_TARBALL' from '$SRC_URL'")
+  echo "${LOG} Trying download using curl . . ."
+  curl -LO --fail "$SRC_URL"
+  if [ "$?" -ne 0 ]
+    then (>&2 echo "${ERROR} Failed to run 'curl' for downloading '$SRC_TARBALL' from '$SRC_URL'")
+    exit -1
+  fi
+fi
+
 tar xzvf $SRC_TARBALL
 cd $SRC_DIR
 ./bootstrap.sh --prefix=$INSTALL_DIR --with-libraries=timer

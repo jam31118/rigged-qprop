@@ -39,6 +39,7 @@ clean:
 	rm -f $(QPROP_SRC)/lib/x86_64/libqprop.a
 
 clean-bin:
+	for bin_name in $(bin_list); do if [ -f "$$bin_name" ]; then rm $$bin_name; fi; done
 	if [ -d "$(QPROP_BIN)" ]; then cd $(QPROP_BIN) && rm -f $(bin_list); fi
 
 clean-data:

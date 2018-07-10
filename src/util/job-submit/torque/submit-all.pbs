@@ -1,0 +1,16 @@
+#!/bin/bash
+
+## Source required scripts
+source $QPROP_HOME/src/util/shell/colors.sh
+
+imag_real_job_script="$QPROP_HOME/src/util/job-submit/torque/imag-real.pbs"
+imag_real_job_id=$(qsub $imag_real_job_script)
+if [ "$?" -ne 0 ]; then (2>&1 echo -e "${ERROR} Failed to submit $imag_real_job_script"); fi
+echo -e "${OK} [$(date)] Submitted $imag_real_job_script with job id: $imag_real_job_id"
+
+
+tsurff_job_script="$QPROP_HOME/src/util/job-submit/torque/tsurff.pbs"
+tsurff_job_id=$(qsub -W depend=afterok:$imag_real_job_id $tsurff_job_script)
+if [ "$?" -ne 0 ]; then (2>&1 echo -e "${ERROR} Failed to submit $tsurff_job_script"); fi
+echo -e "${OK} [$(date)] Submitted $tsurff_job_script with job id: $tsurff_job_id"
+

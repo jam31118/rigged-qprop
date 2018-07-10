@@ -33,7 +33,7 @@ bool if_exist_get_vecpot_param ( parameterListe& para_prop, char direction,
 	  throw "[ERROR] Direction is not valid!"; }
   // construct suffix for each parameter name in a form: '-i-j'
   string suffix = string("-") + string(1, direction)
-    + string("-") + to_string(vecpot_index);
+    + string("-") + to_string((long long int) vecpot_index); // 'long long int' is for working around ambiguous to_string method due to overloading
 
 //  fprintf(stderr, "[ LOG ] direction: '%c' and to_string(direction): '%s'\n", direction, to_string(direction));
   std::cerr << "[ LOG ] direction: " << direction << " and to_string(direction): " << std::string(1, direction) << endl;

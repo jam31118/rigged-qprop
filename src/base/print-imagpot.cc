@@ -26,11 +26,14 @@ int print_imagpot(int argc, char **argv) {
   const long imag_potential_width=long(para_prop.getDouble("imag-width")/delta_r);
   imagpot imaginarypot(imag_potential_width);
 
-  string imagpot_data_file_name("imagpot.dat");
-  FILE *imagpot_data_file = fopen_with_check(imagpot_data_file_name, "w");
+  string imagpot_data_file_name("imagpot.bin");
+  FILE *imagpot_data_file = fopen_with_check(imagpot_data_file_name, "wb");
 
+  double imagpot_value;
   for (long rho_index = 0; rho_index < g_prop.ngps_x(); rho_index++) {
-    fprintf(imagpot_data_file, "%18ld %15.10e\n", rho_index, imaginarypot(rho_index, 0, 0, 0, g_prop));
+    imagpot_value = imaginarypot(rho_index, 0, 0, 0, g_prop);
+    fwrite(&imagpot_value, sizeof(double), 1, imagpot_data_file);
+//  fprintf(imagpot_data_file, "%18ld %15.10e\n", rho_index, imaginarypot(rho_index, 0, 0, 0, g_prop));
   }
 
   fclose(imagpot_data_file);

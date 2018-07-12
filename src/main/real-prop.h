@@ -20,6 +20,7 @@ typedef std::unique_ptr<cplxd[]> cplxd_ptr;
 
 // Functions, which determine potentials
 #include "potentials.hh"
+#include "print-imagpot.hh"
 
 extern "C" int real_prop(int argc, char **argv);
 

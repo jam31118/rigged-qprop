@@ -8,7 +8,7 @@
 #include "potentials.hh"
 #include "grid.h"
 
-int print_imagpot(int argc, char **argv);
+extern "C" int print_imagpot(int argc, char **argv);
 
 #endif // _PRINT_IMAGPOT_H_
 

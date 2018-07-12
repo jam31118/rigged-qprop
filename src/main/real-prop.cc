@@ -126,6 +126,8 @@ int real_prop(int argc, char **argv) {
   // the absorbing imaginary potential
   const long imag_potential_width=long(para_prop.getDouble("imag-width")/delta_r);
   imagpot imaginarypot(imag_potential_width);
+  if ( print_imagpot(-1, NULL) != 0) { fprintf(stderr, "[ERROR] Failed to print imagpot\n"); };
+
   // set the binding potential and the hamiltonian
   double alpha;
   try { alpha = para_ini.getDouble("effpot-alpha"); }

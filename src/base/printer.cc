@@ -1,4 +1,4 @@
-#include "print-imagpot.hh"
+#include "printer.hh"
 
 int print_imagpot(int argc, char **argv) {
   
@@ -7,11 +7,12 @@ int print_imagpot(int argc, char **argv) {
   parameterListe para_tsurff("tsurff.param");
   
   // Add a parameter which determines radial distance between R-tsurff and imag-pot
-  double beyond_R_distance_temp;
-  try { beyond_R_distance_temp = para_tsurff.getDouble("beyond-R"); }
-  catch (std::exception&) { beyond_R_distance_temp = 0.0; }
-  const double beyond_R_distance = beyond_R_distance_temp;
-  double grid_size = para_tsurff.getDouble("R-tsurff") + beyond_R_distance + para_prop.getDouble("imag-width");
+  double grid_size = get_grid_size(para_ini, para_prop, para_tsurff);
+//  double beyond_R_distance_temp;
+//  try { beyond_R_distance_temp = para_tsurff.getDouble("beyond-R"); }
+//  catch (std::exception&) { beyond_R_distance_temp = 0.0; }
+//  const double beyond_R_distance = beyond_R_distance_temp;
+//  double grid_size = para_tsurff.getDouble("R-tsurff") + beyond_R_distance + para_prop.getDouble("imag-width");
 
   const double delta_r = para_ini.getDouble("delta-r");
 

@@ -20,3 +20,7 @@ install: $(targets)
 libqprop.a:
 	+$(MAKE) -C $(QPROP_SRC)/base/ 
 
+clean:
+	$(RM) $(targets)
+	$(MAKE) clean -C $(QPROP_SRC)/base/
+

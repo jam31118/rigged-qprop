@@ -50,11 +50,14 @@ vecpot.o: vecpot.cc
 potentials.o: potentials.cc
 	$(CXX) $(gxxoptions) -c -o $@ $<
 
-print-imagpot.o: print-imagpot.cc
+printer.o: printer.cc
+	$(CXX) $(gxxoptions) -c -o $@ $<
+
+common.o: common.cc
 	$(CXX) $(gxxoptions) -c -o $@ $<
 
 # ar rvs ---> replace files, be verbose, Write an object-file index into the archive
-libqprop.a: bar.o ylm.o wavefunction.o hamop.o grid.o fluid.o factorial.o winop.o parameter.o smallHelpers.o vecpot.o potentials.o print-imagpot.o
+libqprop.a: bar.o ylm.o wavefunction.o hamop.o grid.o fluid.o factorial.o winop.o parameter.o smallHelpers.o vecpot.o potentials.o printer.o common.o
 	ar rvs $@ $^
 
 clean:

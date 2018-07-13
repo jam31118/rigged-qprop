@@ -10,3 +10,14 @@ double get_grid_size(parameterListe para_ini, parameterListe para_prop, paramete
 
   return grid_size;
 }
+
+
+double get_effpot_alpha(parameterListe para_ini) {
+  
+  double alpha;
+  try { alpha = para_ini.getDouble("effpot-alpha"); }
+  catch (std::exception&) { alpha = 0.0; } // default value - if alpha = 0.0 means no effective potential but just become coulumb potential.
+
+  return alpha;
+
+}

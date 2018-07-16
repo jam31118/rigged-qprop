@@ -9,6 +9,7 @@ echo "PBS_O_WORKDIR: $PBS_O_WORKDIR"
 
 
 NPROCS=`wc -l < $PBS_NODEFILE`
+echo -e "Number of processes (\$NPROCS): $NPROCS"
 
 mpiexec_bin="$QPROP_DEP_DIR/openmpi/bin/mpiexec"
 bin=$QPROP_HOME/bin/eval-tsurff-mpi 

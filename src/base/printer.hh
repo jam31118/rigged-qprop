@@ -7,8 +7,10 @@
 #include "smallHelpers.hh"
 #include "potentials.hh"
 #include "grid.h"
+#include "common.hh"
 
 int print_imagpot(int argc, char **argv);
+int print_scalarpot(int argc, char **argv);
 
 #endif // _PRINT_IMAGPOT_H_
 

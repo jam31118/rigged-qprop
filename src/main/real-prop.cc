@@ -126,11 +126,14 @@ int real_prop(int argc, char **argv) {
   // the absorbing imaginary potential
   const long imag_potential_width=long(para_prop.getDouble("imag-width")/delta_r);
   imagpot imaginarypot(imag_potential_width);
+  if ( print_imagpot(-1, NULL) != 0) { fprintf(stderr, "[ERROR] Failed to print imagpot\n"); };
+
   // set the binding potential and the hamiltonian
-  double alpha;
-  try { alpha = para_ini.getDouble("effpot-alpha"); }
-  catch (std::exception&) { alpha = 0.0; } // default value - if alpha = 0.0 means no effective potential but just become coulumb potential.
-  scalarpot scalarpotx(para_ini.getDouble("nuclear-charge"), para_ini.getDouble("pot-cutoff"), alpha);
+//  double alpha;
+//  try { alpha = para_ini.getDouble("effpot-alpha"); }
+//  catch (std::exception&) { alpha = 0.0; } // default value - if alpha = 0.0 means no effective potential but just become coulumb potential.
+  scalarpot scalarpotx(para_ini.getDouble("nuclear-charge"), para_ini.getDouble("pot-cutoff"), get_effpot_alpha(para_ini));
+  if ( print_scalarpot(-1, NULL) != 0) { fprintf(stderr, "[ERROR] Failed to print scalarpot\n"); };
   
 
   // Define hamiltonian object

@@ -2,7 +2,7 @@
 #ifndef grid_h
 #define grid_h grid_h
 
-#include<iostream>
+#include <iostream>
 
 using namespace std;
 

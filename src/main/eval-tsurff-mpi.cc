@@ -1,19 +1,3 @@
-#include <memory>
-#include <complex>
-#include <string>
-#include <iostream>
-#ifdef HAVE_MPI
-#include "mpi.h"
-#endif
-
-typedef std::complex<double> cplxd;
-typedef std::unique_ptr<cplxd[]> cplxd_ptr;
-
-#include <tsurffSpectrum.hh>
-#include <potentials.hh>
-
-#include <vecpot.hh>
-
 #include "eval-tsurff-mpi.h"
 
 

@@ -5,10 +5,10 @@
 
 #SBATCH --output=slurm.%x.%j.log
 
-#SBATCH --ntasks=12
-#SBATCH --nodes=1
+#SBATCH --ntasks=24
+#SBATCH --nodes=2
 
-#SBATCH --partition=g1,g2,g3,g4
+#SBATCH --partition=g3,g4
 
 
 ## Run tsurff

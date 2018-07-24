@@ -1,0 +1,25 @@
+#!/bin/bash
+
+#PBS -l nodes=1:ppn=16
+#PBS -N tsurff
+
+
+cd $PBS_O_WORKDIR
+echo "PBS_O_WORKDIR: $PBS_O_WORKDIR"
+
+
+NPROCS=`wc -l < $PBS_NODEFILE`
+echo -e "Number of processes (\$NPROCS): $NPROCS"
+
+mpiexec_bin="$QPROP_DEP_DIR/openmpi/bin/mpiexec"
+bin=$QPROP_HOME/bin/eval-tsurff-mpi 
+$mpiexec_bin -np $NPROCS $bin > eval.tsurff.log 2>&1
+
+
+## Combine partial data files produced by separate MPI processes
+source $QPROP_HOME/src/util/data/combine_tsurff_data.sh
+
+
+## Possible addition at the end of this script:
+# visualization sript for photoelectric spectra, in a proper colors, possibly in log scale with constant order of magnitudes
+

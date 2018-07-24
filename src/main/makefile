@@ -32,13 +32,14 @@ install: $(bin_list)
 	mv $^ $(QPROP_BIN)
 
 libqprop.a:
-	+make -C $(QPROP_SRC)/base/ 
+	+$(MAKE) -C $(QPROP_SRC)/base/ 
 
 clean:
-	cd $(QPROP_SRC)/base/ && make clean
+	cd $(QPROP_SRC)/base/ && $(MAKE) clean
 	rm -f $(QPROP_SRC)/lib/x86_64/libqprop.a
 
 clean-bin:
+	for bin_name in $(bin_list); do if [ -f "$$bin_name" ]; then rm $$bin_name; fi; done
 	if [ -d "$(QPROP_BIN)" ]; then cd $(QPROP_BIN) && rm -f $(bin_list); fi
 
 clean-data:

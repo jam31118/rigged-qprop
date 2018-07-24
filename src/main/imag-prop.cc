@@ -1,24 +1,3 @@
-#include <iostream>
-#include <complex>
-#include <functional>
-#include <string>
-
-#include <bar.h>
-#include <fluid.h>
-#include <grid.h>
-#include <hamop.h>
-#include <wavefunction.h>
-#include <powers.hh>
-#include <parameter.hh>
-#include <smallHelpers.hh>
-
-// #include <../base/kbhit.cc> // kbhit() for unix 
-//
-// Functions determining the potentials are defined in potentials.hh
-//
-
-#include "potentials.hh"
-
 #include "imag-prop.h"
 
 using std::cout;
@@ -160,14 +139,14 @@ int imag_prop(int argc, char **argv) {
   hamop hamilton;
   wavefunction staticpot, E_i, wf;
 
-
   parameterListe para_ini("initial.param");
   
-  
-  double alpha;
-  try { alpha = para_ini.getDouble("effpot-alpha"); }
-  catch (std::exception&) { alpha = 0.0; } // default value - if alpha = 0.0 means no effective potential but just become coulumb potential.
-  scalarpot scalarpotx(para_ini.getDouble("nuclear-charge"), para_ini.getDouble("pot-cutoff"), alpha);
+//  double alpha;
+//  try { alpha = para_ini.getDouble("effpot-alpha"); }
+//  catch (std::exception&) { alpha = 0.0; } // default value - if alpha = 0.0 means no effective potential but just become coulumb potential.
+//  double alpha = get_effpot_alpha(para_ini);
+  scalarpot scalarpotx(para_ini.getDouble("nuclear-charge"), para_ini.getDouble("pot-cutoff"), get_effpot_alpha(para_ini));
+  if ( print_scalarpot(-1, NULL) != 0) { fprintf(stderr, "[ERROR] Failed to print scalarpot\n"); };
 // scalarpot scalarpotx(para_ini.getDouble("nuclear-charge"), para_ini.getDouble("pot-cutoff"));
   
   //

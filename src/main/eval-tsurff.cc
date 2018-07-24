@@ -1,19 +1,4 @@
-#include <memory>
-#include <complex>
-#include <string>
-#include <iostream>
-
-typedef std::complex<double> cplxd;
-typedef std::unique_ptr<cplxd[]> cplxd_ptr;
-
-#include <tsurffSpectrum.hh>
-#include <potentials.hh>
-
-#include <vecpot.hh>
-
-
 #include "eval-tsurff.h"
-
 
 using std::cout;
 using std::string;
@@ -48,3 +33,4 @@ int eval_tsurff(int argc, char **argv) {
 
   return 0;
 };
+

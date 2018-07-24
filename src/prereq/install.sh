@@ -40,8 +40,8 @@ done
 ## Prepare relavant directories
 BASE_DIR="$QPROP_DEP_DIR"
 
-SCRIPT_DIR="$QPROP_HOME/prereq/script"
-if [ ! -d "$QPROP_HOME" ]; then (>&2 echo -e "${ERROR} Scripts doens't exist"); exit -1; fi
+SCRIPT_DIR="$QPROP_HOME/src/prereq/script"
+if [ ! -d "$SCRIPT_DIR" ]; then (>&2 echo -e "${ERROR} The directory of required scripts doens't exist: $SCRIPT_DIR"); exit -1; fi
 
 LOG_DIR="$BASE_DIR/log"
 if [ ! -d "$LOG_DIR" ]; then mkdir -p $LOG_DIR; fi

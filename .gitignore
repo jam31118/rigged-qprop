@@ -6,6 +6,7 @@
 *.log
 
 bin/
+temp/
 
 ## Avoid including dependency directories
 gsl/

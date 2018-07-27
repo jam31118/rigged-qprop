@@ -19,5 +19,9 @@ D. Bauer and P. Koval, Comput. Phys. Commun. 174, 396 (2006).
 V. Mosert and D. Bauer, Comput. Phys. Commun. 207, 452 (2016).
 
 
+# Visualization
+For visualizing the calculation result by `rigged-qprop`, have a look at [visual-qprop](https://github.com/jam31118/qprop), a toolset dedicated to visualize and analyze the calculation results such as animated time evolution, plotting photoelectric momentum spectra etc.
+
+
 [qprop-website]: http://qprop.de
 [wiki-installation]: https://github.com/jam31118/rigged-qprop/wiki/Installation

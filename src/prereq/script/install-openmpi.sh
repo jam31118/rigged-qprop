@@ -58,14 +58,14 @@ fi
 
 tar xzvf $SRC_TARBALL
 cd $BUILD_DIR
-$SRC_DIR/configure --prefix=$INSTALL_DIR --enable-mpi-cxx
+$SRC_DIR/configure --prefix=$INSTALL_DIR --enable-mpi-cxx --with-tm
 make -j4
 make install
 
 return_code="$?"
 if [ "$return_code" -ne "0" ]
 then
-  (>&2 echo "[ERROR] Failed to install GSL. Aborting . . .")
+  (>&2 echo "[ERROR] Failed to install $PROGRAMNAME. Aborting . . .")
   exit -1
 fi
 

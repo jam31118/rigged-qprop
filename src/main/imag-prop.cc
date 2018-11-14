@@ -1,23 +1,4 @@
-#include <iostream>
-#include <complex>
-#include <functional>
-#include <string>
-
-#include <bar.h>
-#include <fluid.h>
-#include <grid.h>
-#include <hamop.h>
-#include <wavefunction.h>
-#include <powers.hh>
-#include <parameter.hh>
-#include <smallHelpers.hh>
-
-// #include <../base/kbhit.cc> // kbhit() for unix 
-//
-// Functions determining the potentials are defined in potentials.hh
-//
-
-#include "potentials.hh"
+#include "imag-prop.h"
 
 using std::cout;
 using std::endl;
@@ -81,7 +62,7 @@ int get_n_th_eigenstate(long n, const long my_ell_quantum_num, wavefunction *wf_
     return 1;
   }
 
-  wavefunction *p_wf = &wf_arr[n-1];
+  wavefunction *p_wf = &wf_arr[n-1-my_ell_quantum_num];
 
 //  int iinitmode = 2;
   fluid ell_init, m_init;
@@ -96,7 +77,7 @@ int get_n_th_eigenstate(long n, const long my_ell_quantum_num, wavefunction *wf_
   }
   (*p_wf).normalize(g);
 
-  cout << "wf[0] = " << (*p_wf)[0] << endl;
+//  cout << "wf[0] = " << (*p_wf)[0] << endl;
 
   double E_tot_prev, acc, E_tot = *E_tot_in;
   fprintf(file_obser_imag,"[ LOG ] ****************************\n");
@@ -130,7 +111,8 @@ step\n");
     (*p_wf).propagate(timestep, 0.0, g, hamilton, me, staticpot, my_m_quantum_num, scalarpotx.get_nuclear_charge());
 //    cout << "[ LOG ] after propataiong at time: " << time << endl;
 
-    for (long wf_index=my_ell_quantum_num; wf_index<n-1; wf_index++) {
+//    for (long wf_index=my_ell_quantum_num; wf_index<n-1; wf_index++) {
+    for (long wf_index=0; wf_index<n-1-my_ell_quantum_num; wf_index++) {
       substract_component(g, *p_wf, wf_arr[wf_index]);
     }
 //    cout << "[ LOG ] after substraction at time: " << time << endl;
@@ -147,7 +129,7 @@ step\n");
 
 
 
-int main(int argc, char **argv) {
+int imag_prop(int argc, char **argv) {
   //
   // variables
   //
@@ -157,14 +139,14 @@ int main(int argc, char **argv) {
   hamop hamilton;
   wavefunction staticpot, E_i, wf;
 
-
   parameterListe para_ini("initial.param");
   
-  
-  double alpha;
-  try { alpha = para_ini.getDouble("effpot-alpha"); }
-  catch (std::exception&) { alpha = 0.0; } // default value - if alpha = 0.0 means no effective potential but just become coulumb potential.
-  scalarpot scalarpotx(para_ini.getDouble("nuclear-charge"), para_ini.getDouble("pot-cutoff"), alpha);
+//  double alpha;
+//  try { alpha = para_ini.getDouble("effpot-alpha"); }
+//  catch (std::exception&) { alpha = 0.0; } // default value - if alpha = 0.0 means no effective potential but just become coulumb potential.
+//  double alpha = get_effpot_alpha(para_ini);
+  scalarpot scalarpotx(para_ini.getDouble("nuclear-charge"), para_ini.getDouble("pot-cutoff"), get_effpot_alpha(para_ini));
+  if ( print_scalarpot(-1, NULL) != 0) { fprintf(stderr, "[ERROR] Failed to print scalarpot\n"); };
 // scalarpot scalarpotx(para_ini.getDouble("nuclear-charge"), para_ini.getDouble("pot-cutoff"));
   
   //
@@ -293,9 +275,9 @@ int main(int argc, char **argv) {
   double E_tot = 0.0;
   const cplxd timestep(0.0, -1.0*imag_timestep);
   
-  wavefunction *wf_arr = new wavefunction[initial_n];
+  wavefunction *wf_arr = new wavefunction[initial_n-my_ell_quantum_num];
   wavefunction *p_wf;
-  for (long wf_index = 0; wf_index < initial_n; wf_index++) {
+  for (long wf_index = 0; wf_index < initial_n-my_ell_quantum_num; wf_index++) {
     p_wf = &wf_arr[wf_index];
     (*p_wf).init(g.size());
     if (g.dimens()==34) { (*p_wf).init(g, iinitmode, 1.0, ell_init); } 
@@ -311,7 +293,7 @@ int main(int argc, char **argv) {
     std::cerr << "[ERROR] Failed to get " << initial_n-1 << "-th eigenstate\n";
     return 1;
   }
-  wf = wf_arr[initial_n-1];
+  wf = wf_arr[initial_n-1-my_ell_quantum_num];
 
 
 //  // printf("Press any key to finish imaginary-time propagation...\n");
@@ -364,7 +346,11 @@ int main(int argc, char **argv) {
   // *** declare the grid for propagation ***
   grid g_prop;
   g_prop.set_dim(para_ini.getLong("qprop-dim"));
-  double grid_size = para_prop.getDouble("imag-width") + para_tsurff.getDouble("R-tsurff");
+  double beyond_R_distance_temp;
+  try { beyond_R_distance_temp = para_tsurff.getDouble("beyond-R"); }
+  catch (std::exception&) { beyond_R_distance_temp = 0.0; }
+  const double beyond_R_distance = beyond_R_distance_temp;
+  double grid_size = para_tsurff.getDouble("R-tsurff") + beyond_R_distance + para_prop.getDouble("imag-width");
 
   // [NOTE] It assumes there's no quiver-amplitude addition.
   // However, it should become possible to add more space beyond R-tsurff

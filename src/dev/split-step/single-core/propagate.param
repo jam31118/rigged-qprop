@@ -1,0 +1,15 @@
+imag-width double 150.0
+ell-grid-size long 15
+max-electric-field double 0.02387
+omega double 0.085
+num-cycles double 5.0
+# time step for propagation; delta-r/4 is a sensible choice
+delta-t double 0.05
+
+## Grid parameters
+add-quiver-amplitude-in-real-prop bool 1
+
+## timesteps
+start-time-index long 20000
+num-time-index long 3392
+

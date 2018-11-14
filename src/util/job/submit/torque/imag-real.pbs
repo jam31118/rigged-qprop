@@ -1,0 +1,19 @@
+#!/bin/bash
+
+#PBS -l nodes=1:ppn=1
+#PBS -N imag-real
+
+echo "[$(date)] Running at host with name: $(hostname)"
+
+cd $PBS_O_WORKDIR
+echo "PBS_O_WORKDIR: $PBS_O_WORKDIR / pwd: $(pwd)"
+
+$QPROP_HOME/bin/imag-prop > im.log 2>&1
+$QPROP_HOME/bin/real-prop > re.log 2>&1
+
+
+## Possible addition at the end of this script:
+# visualization script for ell-spectrum
+# visualization script for probability flux at R-tsurff
+# visualization script for plotting the final state function in real space
+# visualization script for vector potential

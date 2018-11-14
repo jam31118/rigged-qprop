@@ -2,11 +2,18 @@
 *.o
 *.txt
 *.raw
-*.dat
 *.bin
 *.log
-bin/
 
+bin/
+temp/
+
+## Avoid including dependency directories
 gsl/
 boost/
 openmpi/
+dep/
+
+## For system-specific compilation
+make.sh.local
+

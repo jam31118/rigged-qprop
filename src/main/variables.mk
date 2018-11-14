@@ -1,4 +1,6 @@
-optimargs=-O3 -ffast-math -march=native
+cpu_type = generic
+arch_flags = -mtune=$(cpu_type) 
+optimargs=-O3 $(arch_flags) -ffast-math
 
 LIBHOME=$(QPROP_DEP_DIR)
 GSLHOME=$(LIBHOME)/gsl/

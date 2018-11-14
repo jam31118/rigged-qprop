@@ -5,12 +5,14 @@
 if [ ! -d "$QPROP_HOME" ]
 then
   (>&2 echo "[ERROR] Please set \$QPROP_HOME to valid path where source code resides")
+  (>&2 echo "[ LOG ] Current \$QPROP_HOME: '$QPROP_HOME'")
   exit -1
 fi
 
 if [ ! -d "$QPROP_DEP_DIR" ]
 then
   (>&2 echo "[ERROR] Please set \$QPROP_DEP_DIR to valid path where you want to install dependencies of QPROP")
+  (>&2 echo "[ LOG ] Current \$QPROP_DEP_DIR: '$QPROP_DEP_DIR'")
   exit -1
 fi
 
@@ -32,7 +34,7 @@ echo "[ LOG ] LOG_DIR: $LOG_DIR"
 for program in gsl openmpi boost
 do
   script_path="$SCRIPT_DIR/install-$program.sh"
-  if [ ! -f "$script_path" ]; then (>&2 echo "[ERROR] Script \'$script_path\' doens't exist"); exit -1; fi
+  if [ ! -f "$script_path" ]; then (>&2 echo "[ERROR] Script '$script_path' doens't exist"); exit -1; fi
   log_file_path="$LOG_DIR/$program.log"
   echo "[ LOG ] Installing $program . . . "
   echo "[ LOG ] For detail information, refer to $log_file_path"

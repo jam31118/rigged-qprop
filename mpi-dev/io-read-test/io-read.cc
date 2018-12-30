@@ -1,8 +1,15 @@
 #include <iostream>
 #include <cstdlib>
+#include <complex>
 #include "mpi.h"
 
 using namespace std;
+
+// set data type
+typedef complex<double> element_type;
+MPI_Datatype datatype = MPI::DOUBLE_COMPLEX;
+//MPI_Datatype datatype = MPI_DOUBLE_COMPLEX;
+
 
 int error_and_exit(int rank, int return_code, const char *func_name) {
   fprintf(stderr, "In process with rank '%d': something got wrong in '%s' with return code: '%d'\n",
@@ -40,9 +47,6 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  // set data type
-  MPI_Datatype datatype = MPI_DOUBLE;
-
 
   //// Getting MPI communication size and process rank
   return_code = MPI_Comm_size(MPI_COMM_WORLD, &num_of_process);
@@ -73,6 +77,7 @@ int main(int argc, char *argv[]) {
   int datatype_size;
   return_code = MPI_Type_size(datatype, &datatype_size);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_Type_size"); }
+  if (rank == 0) { fprintf(stdout, "[@rank=%d] The size of the elementry datatype = %d\n", rank, datatype_size); }
 
   // Determine number of elements to read for each process
   long num_of_elements_in_file = file_size / datatype_size;
@@ -95,7 +100,7 @@ int main(int argc, char *argv[]) {
   read_offset = rank * num_of_elements_per_proc * datatype_size;
   
   // Memory allocation
-  double *p_buf = (double *) malloc(num_of_elements_to_read * datatype_size);
+  element_type *p_buf = (element_type *) malloc(num_of_elements_to_read * datatype_size);
   if (p_buf == NULL) { return error_and_exit(rank, 1, "malloc"); }
 
   // Read data collectively from a single data file
@@ -105,7 +110,10 @@ int main(int argc, char *argv[]) {
 
   // Print data
   long i;
-  for (i=0; i<num_of_elements_to_read; i++) { fprintf(stdout, "[@rank=%d] buf[%ld] = %f\n", rank, i, p_buf[i]); }
+  for (i=0; i<num_of_elements_to_read; i++) { 
+    cout << "[@rank=" << rank << "] buf[" << i << "] = " << p_buf[i] << endl;
+//    fprintf(stdout, "[@rank=%d] buf[%ld] = %f\n", rank, i, p_buf[i]); 
+  }
 
   // Close file
   return_code = MPI_File_close(&fh);

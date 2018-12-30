@@ -21,3 +21,15 @@ double get_effpot_alpha(parameterListe para_ini) {
   return alpha;
 
 }
+
+
+int get_ell_and_m_from_lm_index(long lm_index, long *p_ell, long *p_m) {
+  if (lm_index < 0) { return 1; }
+  long ell = long(sqrt(lm_index));
+  long m = lm_index - ell*(ell+1);
+  if ((m > ell)||(m<-ell)) { return 1; }
+  *p_ell = ell;
+  *p_m = m;
+  return 0;
+}
+

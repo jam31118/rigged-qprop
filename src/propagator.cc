@@ -7,7 +7,7 @@ void evaluate_Numerov_boosted_CN_propagator_tridiags_for_sph_harm_basis(long l, 
    * */
 
   //// Declare required variables
-  std::complex<double> one_i = std::complex<double>(0,1.0);
+//  std::complex<double> one_i = std::complex<double>(0,1.0);
   std::complex<double> coef = std::complex<double>(0,sign * delta_t * 0.5);
   double h = delta_rho;
   std::complex<double> c1, c2;
@@ -20,7 +20,7 @@ void evaluate_Numerov_boosted_CN_propagator_tridiags_for_sph_harm_basis(long l, 
   std::complex<double> *p_diag_V_l;
 
   //// Evaulate `diag_unitary`
-  c1 = -5.0/3.0 + coef * -2.0/(h*h);
+  c1 = -5.0/3.0 + coef * (-2.0/(h*h));
   std::complex<double> *p_diag_unitary = diag_unitary,
     *p_diag_unitary_max = diag_unitary + N_rho;
   p_diag_V_l = diag_V_l;
@@ -46,6 +46,10 @@ void evaluate_Numerov_boosted_CN_propagator_tridiags_for_sph_harm_basis(long l, 
   }
   upper_offdiag_unitary[N_rho-2] = w[N_rho-1];
   // [NOTE] note that `lower_offdiag_unitary` and `upper_offdiag_unitary` is of length `N_rho-`
+  
+  //// Free temporary array
+  delete [] w;
+  delete [] diag_V_l;
 }
 
 void evaluate_diag_V_l(long l, double *scalarpot, double *rho_array, double *imagpot, std::complex<double> *diag_V_l, long N_rho) {
@@ -54,7 +58,6 @@ void evaluate_diag_V_l(long l, double *scalarpot, double *rho_array, double *ima
          *p_rho_array = rho_array,
          *p_imagpot = imagpot;
   std::complex<double> *p_diag_V_l = diag_V_l, *p_diag_V_l_max = diag_V_l + N_rho;
-  
   
   // Prepare temporary variable
   double rho;

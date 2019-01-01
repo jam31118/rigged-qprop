@@ -185,6 +185,14 @@ class grid {
       //return long( y/delta_y + offse_y);
   };
 
+  inline long num_of_phi_lm() const {
+    switch (dimension) {
+      case 34: return n_gps_y;
+      case 44: return n_gps_y * n_gps_y;
+      default: return -1;
+    }
+  };
+
   
  private:
   

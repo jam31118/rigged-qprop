@@ -5,4 +5,4 @@ double get_grid_size(parameterListe para_ini, parameterListe para_prop, paramete
 
 double get_effpot_alpha(parameterListe para_ini);
 
-int get_ell_and_m_from_lm_index(long lm_index, long *p_ell, long *p_m);
+int get_ell_and_m_from_lm_index(long lm_index, long *p_ell, long *p_m, long initial_m, long qprop_dim);

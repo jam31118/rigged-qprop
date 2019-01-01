@@ -23,10 +23,21 @@ double get_effpot_alpha(parameterListe para_ini) {
 }
 
 
-int get_ell_and_m_from_lm_index(long lm_index, long *p_ell, long *p_m) {
+int get_ell_and_m_from_lm_index(long lm_index, long *p_ell, long *p_m, long initial_m, long qprop_dim) {
   if (lm_index < 0) { return 1; }
-  long ell = long(sqrt(lm_index));
-  long m = lm_index - ell*(ell+1);
+  long ell,m;
+  switch (qprop_dim) {
+    case 34:
+      ell = lm_index;
+      m = initial_m;
+      break;
+    case 44:
+      ell = long(sqrt(lm_index));
+      m = lm_index - ell*(ell+1);
+      break;
+    default:
+      return 1;
+  } 
   if ((m > ell)||(m<-ell)) { return 1; }
   *p_ell = ell;
   *p_m = m;

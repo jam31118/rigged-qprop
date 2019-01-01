@@ -14,9 +14,46 @@
 //// headers from `matrix`
 #include "matrix.hh"
 
-//// `main` program starts here
-int main() {
+//// headers for MPI
+#include "mpi.h"
 
+int error_and_exit(int rank, int return_code, const char *func_name) {
+  fprintf(stderr, "In process with rank '%d': something got wrong in '%s' with return code: '%d'\n",
+      rank, func_name, return_code);
+  MPI_Finalize();
+  return return_code;
+}
+
+//// `main` program starts here
+int main(int argc, char *argv[]) {
+  
+  //// Declare variables with optional initialization
+  int return_code = -1;
+  int num_of_process = -1, rank = -1;
+  
+  //// MPI Initialization
+  return_code = MPI_Init(&argc, &argv);
+  if (return_code == MPI_SUCCESS) {
+    fprintf(stdout, "[ LOG ] MPI program has been initialized.\n");
+  } else {
+    fprintf(stderr, "[ERROR] Something got wrong during initialization.\n");
+    return -1;
+  }
+
+  //// Getting MPI communication size and process rank
+  return_code = MPI_Comm_size(MPI_COMM_WORLD, &num_of_process);
+  if (return_code != MPI_SUCCESS || num_of_process < 0) {
+    fprintf(stderr, "[ERROR} Something got wrong during getting number of processes\n");
+    MPI_Finalize();
+    return -1;
+  }
+  return_code = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (return_code != MPI_SUCCESS || rank < 0) {
+    fprintf(stderr, "[ERROR} Something got wrong during getting rank\n");
+    MPI_Finalize();
+    return -1;
+  }
+  
   //// Load parameter files for QPROP
   parameterListe para_ini("initial.param");
   parameterListe para_prop("propagate.param");
@@ -57,27 +94,34 @@ int main() {
   g_prop.set_offs(0, 0, 0);
 
   //// Configure wf file 
-  std::ifstream current_wf_bin_file;
+  // open file
   string current_wf_bin_file_name = string("current-wf.bin");
-  current_wf_bin_file.open(current_wf_bin_file_name, std::ifstream::ate | std::ifstream::binary);
-  long current_wf_file_size = current_wf_bin_file.tellg();
-  current_wf_bin_file.close();
-  std::cout << "[ LOG ] current_wf_file_size: " << current_wf_file_size << std::endl;
+  MPI_File fh;
+  return_code = MPI_File_open(MPI_COMM_WORLD, current_wf_bin_file_name.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_open"); }
+
+  // Get file size
+  MPI_Offset file_size;
+  return_code = MPI_File_get_size(fh, &file_size);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_get_size"); }
+  if (rank == 0) { fprintf(stdout, "[@rank=%d] The size of file '%s' = %lld\n", rank, current_wf_bin_file_name.c_str(), file_size); }
+  long current_wf_file_size = file_size;
+
+//  std::ifstream current_wf_bin_file;
+//  string current_wf_bin_file_name = string("current-wf.bin");
+//  current_wf_bin_file.open(current_wf_bin_file_name, std::ifstream::ate | std::ifstream::binary);
+//  long current_wf_file_size = current_wf_bin_file.tellg();
+//  current_wf_bin_file.close();
+//  std::cout << "[ LOG ] current_wf_file_size: " << current_wf_file_size << std::endl;
   
-  // Dertermine the number of basis wf (i.e. `wf_lm`) in the wf file
+  // Determine the number of basis wf (i.e. `wf_lm`) in the wf file
   long num_of_wf_lm = g_prop.num_of_phi_lm();
   if (num_of_wf_lm < 0) { std::cerr << "[ERROR] during `g_prop.num_of_phi_lm()`\n"; return -1; }
-//  switch (g_prop.dimens()) {
-//    case 34: num_of_wf_lm = g_prop.ngps_y(); break;
-//    case 44: num_of_wf_lm = g_prop.ngps_y() * g_prop.ngps_y(); break;
-//    default:
-//             std::cerr << "[ERROR] unknown qprop-dimension: " 
-//               << g_prop.dimens() << std::endl;
-//             return -1;
-//  }
   std::cout << "[ LOG ] num_of_wf_lm = " << num_of_wf_lm << std::endl;
+
   // Determine the `bytes_per_wf` to read
   long bytes_per_wf = current_wf_file_size / num_of_wf_lm;
+
   // Determine the number of numbers per wf and check if it is same as `N_rho`
   long num_of_numbers_per_wf = bytes_per_wf / sizeof(std::complex<double>);
   if (num_of_numbers_per_wf != N_rho) {
@@ -87,8 +131,21 @@ int main() {
 
   //// Set parameter
   long lm_index_start, lm_index_max, num_of_wf_to_read;
-  lm_index_start = 0;
-  num_of_wf_to_read = num_of_wf_lm;
+  long num_of_wf_per_proc;
+  num_of_wf_per_proc = ( num_of_wf_lm + (num_of_process - 1) ) / num_of_process;
+  if ( num_of_wf_lm >= num_of_process ) {
+    num_of_wf_to_read = num_of_wf_per_proc;
+    if (rank == num_of_process - 1) {
+      num_of_wf_to_read = num_of_wf_lm - (num_of_process - 1) * num_of_wf_per_proc;
+    } 
+  } else {
+      if (rank < num_of_wf_lm) { num_of_wf_to_read = 1; }
+      else { num_of_wf_to_read = 0; }
+  }
+//  num_of_wf_to_read = num_of_wf_lm;
+//  lm_index_start = 0;
+  lm_index_start = rank * num_of_wf_per_proc;
+
   lm_index_max = lm_index_start + num_of_wf_to_read;
   if (lm_index_max > num_of_wf_lm) {
     std::cerr << "[ERROR] `lm_index_max` should not exceed `num_of_wf_lm`\n";
@@ -97,17 +154,26 @@ int main() {
 
   //// specify wf region to read
   long offset_lm;
+//  MPI_Offset offset_lm;
   offset_lm = lm_index_start * bytes_per_wf;
   std::cout << "[ LOG ] offset_lm = " << offset_lm << std::endl;
   std::cout << "[ LOG ] bytes_per_wf = " << bytes_per_wf << std::endl;
 
   //// Read wf data from file
   std::complex<double> *wf_read = new std::complex<double>[N_rho * num_of_wf_to_read];
-  current_wf_bin_file.open(current_wf_bin_file_name, std::ifstream::binary);
-  current_wf_bin_file.seekg(offset_lm);
-  long bytes_to_read = num_of_wf_to_read * bytes_per_wf;
-  current_wf_bin_file.read((char *)wf_read, bytes_to_read);
-  current_wf_bin_file.close();
+  MPI_Status read_status;
+  return_code = MPI_File_read_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, MPI::DOUBLE_COMPLEX, &read_status);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_read_at"); }
+
+  // Close file
+  return_code = MPI_File_close(&fh);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_close"); }
+
+//  current_wf_bin_file.open(current_wf_bin_file_name, std::ifstream::binary);
+//  current_wf_bin_file.seekg(offset_lm);
+//  long bytes_to_read = num_of_wf_to_read * bytes_per_wf;
+//  current_wf_bin_file.read((char *)wf_read, bytes_to_read);
+//  current_wf_bin_file.close();
 
   //// Allocate memory
   // declare pointers for l-indenpendent, double arrays
@@ -257,27 +323,54 @@ int main() {
     //// Logging
     if (((time_index + 1) % num_of_steps_to_print_progress) == 0) {
       num_of_steps_done_so_far = time_index - start_time_index;
-      std::cout << "[ LOG ] num_of_steps_done_so_far = " << num_of_steps_done_so_far + 1 << " / " << num_of_time_steps << std::endl;
+      if (rank == 0) {
+        std::cout << "[@rank=" << rank << "][ LOG ] num_of_steps_done_so_far = " << num_of_steps_done_so_far + 1 << " / " << num_of_time_steps << std::endl;
+      }
     }
   }
   std::cout << "[ LOG ] Propagation done\n";
 
   //// Write wf data to a file
-  std::ofstream current_wf_bin_file_out;
-  current_wf_bin_file_out.open(current_wf_bin_file_name, std::ios::binary);
-  current_wf_bin_file_out.write((char *) wf_read, bytes_to_read);
-  current_wf_bin_file_out.close();
+//  MPI_File fh;
+  return_code = MPI_File_open(MPI_COMM_WORLD, current_wf_bin_file_name.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_open"); }
+
+  MPI_Status write_status;
+  return_code = MPI_File_write_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, MPI::DOUBLE_COMPLEX, &write_status);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write_at"); }
+
+  //// Check `write_status` to confirm how many elements has been written
+
+  // Close file
+  return_code = MPI_File_close(&fh);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_close"); }
+
+//  std::ofstream current_wf_bin_file_out;
+//  current_wf_bin_file_out.open(current_wf_bin_file_name, std::ios::binary);
+//  current_wf_bin_file_out.write((char *) wf_read, bytes_to_read);
+//  current_wf_bin_file_out.close();
   
   //// Write propagator arrays to files
-  FILE *diag_unitary_file = fopen("diag_unitary_stack.bin", "wb");
-  fwrite(diag_unitary_stack, sizeof(std::complex<double>), N_rho*num_of_wf_lm, diag_unitary_file);
-  fclose(diag_unitary_file);
-  FILE *lower_offdiag_unitary_file = fopen("lower_offdiag_unitary_stack.bin", "wb");
-  fwrite(lower_offdiag_unitary_stack, sizeof(std::complex<double>), (N_rho-1)*num_of_wf_lm, lower_offdiag_unitary_file);
-  fclose(lower_offdiag_unitary_file);
-  FILE *upper_offdiag_unitary_file = fopen("upper_offdiag_unitary_stack.bin", "wb");
-  fwrite(upper_offdiag_unitary_stack, sizeof(std::complex<double>), (N_rho-1)*num_of_wf_lm, upper_offdiag_unitary_file);
-  fclose(upper_offdiag_unitary_file);
+//  if (rank==0) {
+//    FILE *diag_unitary_file = fopen("diag_unitary_stack.bin", "wb");
+//    fwrite(diag_unitary_stack, sizeof(std::complex<double>), N_rho*num_of_wf_lm, diag_unitary_file);
+//    fclose(diag_unitary_file);
+//    FILE *lower_offdiag_unitary_file = fopen("lower_offdiag_unitary_stack.bin", "wb");
+//    fwrite(lower_offdiag_unitary_stack, sizeof(std::complex<double>), (N_rho-1)*num_of_wf_lm, lower_offdiag_unitary_file);
+//    fclose(lower_offdiag_unitary_file);
+//    FILE *upper_offdiag_unitary_file = fopen("upper_offdiag_unitary_stack.bin", "wb");
+//    fwrite(upper_offdiag_unitary_stack, sizeof(std::complex<double>), (N_rho-1)*num_of_wf_lm, upper_offdiag_unitary_file);
+//    fclose(upper_offdiag_unitary_file);
+//  }
+  
+  //// MPI Finalization
+  return_code = MPI_Finalize();
+  if (return_code == MPI_SUCCESS) {
+    fprintf(stdout, "[ LOG ] MPI program has been finalized.\n");
+  } else {
+    fprintf(stderr, "[ERROR] Something got wrong during finalization.\n");
+    return -1;
+  }
 
   //// End this program
   return 0;

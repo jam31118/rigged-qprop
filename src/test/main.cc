@@ -53,6 +53,10 @@ int main(int argc, char *argv[]) {
     MPI_Finalize();
     return -1;
   }
+
+  //// MPI general configrations
+  MPI_Datatype element_type;
+  element_type = MPI::DOUBLE_COMPLEX;
   
   //// Load parameter files for QPROP
   parameterListe para_ini("initial.param");
@@ -328,48 +332,56 @@ int main(int argc, char *argv[]) {
   }
   fprintf(stdout, "[@rank=%d][ LOG ] Propagation done\n", rank);
 
+
   //// Write tsurff-quantities to files 
-  MPI_Datatype block_type, element_type;
-  element_type = MPI::DOUBLE_COMPLEX;
+  // Define a MPI data type
+  // : an array of blocks corresponding to each process, 
+  // : thus separated with a certain interval
+  // - The number of blocks is `num_of_time_steps`.
+  // - The blocks are separated by a interval consisting of several `element_type`s.
+  //   The length ot that interval is `num_of_wf_lm`.
+  // - Each block consists of several `element_type`s.
+  //   The number of the `element_type`s per block is `num_of_wf_to_read`
+  MPI_Datatype block_type;
   MPI_Type_vector(num_of_time_steps, num_of_wf_to_read, num_of_wf_lm, element_type, &block_type);
   MPI_Type_commit(&block_type);
-
+  // Get `element_type`s size
   int element_type_size;
   MPI_Type_size(element_type, &element_type_size);
+  // Determine displacement (`disp`) for this process
   MPI_Offset disp, end_position;
   disp = rank * num_of_wf_per_proc * element_type_size;
+  // Declare variables for MPI writing process
   MPI_Status write_status;
   MPI_File tsurff_psi_raw_file, tsurff_dpsidr_raw_file;
-
+  // Write tsurff quantities to file after setting view
+  // - in this case, it corresponds to imposing a kind of mask to a file 
+  //   so that a contiguous array of tsurff quantities can be stored at once 
+  //   without looping over each time step
+  // This is for `tsurffpsi.raw`
   MPI_File_open(MPI_COMM_WORLD, "tsurffpsi.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_psi_raw_file);
   MPI_File_get_position(tsurff_psi_raw_file, &end_position);
   MPI_File_set_view(tsurff_psi_raw_file, end_position+disp, element_type, block_type, "native", MPI_INFO_NULL);
   return_code = MPI_File_write(tsurff_psi_raw_file, psi_R_arr, tsurff_buffer_length, element_type, &write_status);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write"); }
-
+  // This is for `tsurff-dpsidr.raw`
   MPI_File_open(MPI_COMM_WORLD, "tsurff-dpsidr.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_dpsidr_raw_file);
   MPI_File_get_position(tsurff_dpsidr_raw_file, &end_position);
   MPI_File_set_view(tsurff_dpsidr_raw_file, end_position+disp, element_type, block_type, "native", MPI_INFO_NULL);
   return_code = MPI_File_write(tsurff_dpsidr_raw_file, dpsi_drho_R_arr, tsurff_buffer_length, element_type, &write_status);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write"); }
 
-//  for (i=0; i<tsurff_buffer_length; i++) {
-//    std::cout << psi_R_arr[i] << " ";
-//  } std::cout << std::endl;
-//  for (i=0; i<tsurff_buffer_length; i++) {
-//    std::cout << dpsi_drho_R_arr[i] << " ";
-//  } std::cout << std::endl;
-  
 
   //// Write wf data to a file
+  // Open file
   return_code = MPI_File_open(MPI_COMM_WORLD, current_wf_bin_file_name.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_open"); }
-
+  // Write
   MPI_Status write_status_wf;
-  return_code = MPI_File_write_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, MPI::DOUBLE_COMPLEX, &write_status_wf);
+  return_code = MPI_File_write_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, element_type, &write_status_wf);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write_at"); }
 
-  //// Check `write_status` to confirm how many elements has been written
+  // [NOTE] Check `write_status` to confirm how many elements has been written
 
   // Close file
   return_code = MPI_File_close(&fh);

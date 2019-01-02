@@ -17,11 +17,3 @@ dep/
 ## For system-specific compilation
 make.sh.local
 
-=======
-*.bin
-*.log
-*.dat
-*.raw
-*.param
-dep/
->>>>>>> ppp/master

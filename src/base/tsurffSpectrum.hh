@@ -175,6 +175,15 @@ class tsurffSpectrum {
 public:
   tsurffSpectrum(const parameterListe &param_ini, const parameterListe &param_prop, const parameterListe &param_tsurff, vx vecpotx, vy vecpoty, vz vecpotz, string filename="tsurff")
     : thetas_surff(101, 0.0), phis_surff(101, 0.0), k_values(100, 0.0), psi(filename+string("psi.raw"), std::ios::binary), dpsi_dr(filename+string("-dpsidr.raw"), std::ios::binary), vecpot_x(vecpotx), vecpot_y(vecpoty), vecpot_z(vecpotz) {
+
+    //// Set MPI rank and number of processes
+    i_proc=0;
+    num_proc=1;
+#ifdef HAVE_MPI
+    MPI_Comm_rank(MPI_COMM_WORLD, &i_proc);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
+#endif // for `HAVE_MPI`
+
     expansion_scheme = param_tsurff.getLong("expansion-scheme");
     delta_r = param_ini.getDouble("delta-r");
     delta_t = param_prop.getDouble("delta-t");
@@ -202,15 +211,69 @@ public:
     const double pulse_duration=(qprop_dim==34)?vecpot_z.get_duration():vecpot_x.get_duration();
     
     // how long do the slowest electrons have time to reach the t-SURFF boundary
-    const double time_surff=param_tsurff.getDouble("R-tsurff")/param_tsurff.getDouble("p-min-tsurff");
-    duration=pulse_duration+time_surff;
+    const double time_surff_from_parameter=param_tsurff.getDouble("R-tsurff")/param_tsurff.getDouble("p-min-tsurff");
+//    const double time_surff=param_tsurff.getDouble("R-tsurff")/param_tsurff.getDouble("p-min-tsurff");
+    const double duration_from_parameter = pulse_duration + time_surff_from_parameter;
+    double duration_from_raw_file;
+    long cur_pos;
+    long psi_file_size, dpsidr_file_size;
 
-    i_proc=0;
-    num_proc=1;
+#ifdef HAVE_MPI
+    MPI_File psi_file_mpi, dpsidr_file_mpi;
+    MPI_Offset psi_file_size_offset, dpsidr_file_size_offset;
+
+    MPI_File_open(MPI_COMM_WORLD, (filename+string("psi.raw")).c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &psi_file_mpi);
+    MPI_File_get_size(psi_file_mpi, &psi_file_size_offset);
+    MPI_File_close(&psi_file_mpi);
+    psi_file_size = (long) psi_file_size_offset;
+
+    MPI_File_open(MPI_COMM_WORLD, (filename+string("-dpsidr.raw")).c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &dpsidr_file_mpi);
+    MPI_File_get_size(dpsidr_file_mpi, &dpsidr_file_size_offset);
+    MPI_File_close(&dpsidr_file_mpi);
+    dpsidr_file_size = (long) dpsidr_file_size_offset;
+#else
+    cur_pos = psi.tellg();
+    psi.seekg(0, psi.end);
+    psi_file_size = psi.tellg();
+    psi.seekg(cur_pos, psi.beg);
+
+    cur_pos = dpsi_dr.tellg();
+    dpsi_dr.seekg(0, dpsi_dr.end);
+    dpsidr_file_size = dpsi_dr.tellg();
+    dpsi_dr.seekg(cur_pos, dpsi_dr.beg);
+#endif
+
+//    cout <<"psi_file_size: " << psi_file_size << endl;
+//    cout <<"dpsidr_file_size: " << dpsidr_file_size << endl;
+
+    long raw_file_size;
+    if (psi_file_size != dpsidr_file_size) {
+      fprintf(stderr,"[ERROR] inconsistent file size for *.raw files\n");
+      exit(-1);
+    } else {
+      raw_file_size = psi_file_size;
+    }
+    const long num_of_time_steps = raw_file_size / sizeof(cplxd) / ell_m_grid_size;
+    if (i_proc == 0) {
+      cout << "num_of_time_steps: "<< num_of_time_steps<<"\n";
+    }
+    duration_from_raw_file = delta_t * num_of_time_steps;
+    
+//    duration=pulse_duration+time_surff;
+    duration = duration_from_raw_file;
+
+    if (i_proc == 0) {
+      cout << "[ LOG ] duration_from_raw_file: " << duration_from_raw_file << endl;
+      cout << "[ LOG ] duration_from_parameter: " << duration_from_parameter << endl;
+      cout << "[ LOG ] duration: " << duration << endl;
+    }
+
+//    i_proc=0;
+//    num_proc=1;
     num_k_proc=num_k_surff;
 #ifdef HAVE_MPI
-    MPI_Comm_rank(MPI_COMM_WORLD, &i_proc);
-    MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
+//    MPI_Comm_rank(MPI_COMM_WORLD, &i_proc);
+//    MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
     num_k_proc=num_k_surff/num_proc;
     // last proc has to work more sometimes..
     if (i_proc==(num_proc-1))

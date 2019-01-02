@@ -269,16 +269,34 @@ int main(int argc, char *argv[]) {
     std::cout << "[@rank=" << rank << "]" << "[ LOG ] post_prop_duration: " << post_prop_duration << std::endl;
   }
 
+  //// Prepare memory for storing tsurff-quantity
+  long tsurff_buffer_length = num_of_wf_to_read * num_of_time_steps;
+  std::complex<double> *psi_R_arr = new std::complex<double>[tsurff_buffer_length];
+  std::complex<double> *dpsi_drho_R_arr = new std::complex<double>[tsurff_buffer_length];
+  long index_at_R = g_prop.rindex(para_tsurff.getDouble("R-tsurff"));
+  const double one_over_12delta_rho = 1.0/(12.0*delta_rho);
+  const double two_over_3delta_rho = 2.0/(3.0*delta_rho);
+  long tsurff_buf_index;
+
   //// Start iteration over each `wf_lm` for `lm_index`
-  long num_of_steps_done_so_far;
+  long lm_index_from_zero;
+  long num_of_steps_done_so_far, time_index_from_zero;
   long num_of_numbers_before_this_wf_lm;
   std::complex<double> *wf_lm = wf_read;
   std::complex<double> *wf_lm_mid = new std::complex<double>[N_rho];
   for (time_index=start_time_index; time_index<time_index_max; ++time_index) {
+    time_index_from_zero = time_index - start_time_index;
     for (lm_index=lm_index_start; lm_index<lm_index_max; ++lm_index) {
+      lm_index_from_zero = lm_index - lm_index_start;
     //// Set wf_lm pointer
     num_of_numbers_before_this_wf_lm = (lm_index - lm_index_start) * num_of_numbers_per_wf;
     wf_lm = wf_read + num_of_numbers_before_this_wf_lm; 
+    
+    //// Evaulate tsurff-related values
+    tsurff_buf_index = time_index_from_zero * num_of_wf_to_read + lm_index_from_zero;
+    psi_R_arr[tsurff_buf_index] = wf_lm[index_at_R];
+    dpsi_drho_R_arr[tsurff_buf_index] = two_over_3delta_rho*(wf_lm[index_at_R+1] - wf_lm[index_at_R-1]) - one_over_12delta_rho*(wf_lm[index_at_R+2]-wf_lm[index_at_R-2]);
+    //// end
 
     //// Set offset in propagators stacks to select for the current `l` values
     offset_in_diag_unitary_stack = (lm_index-lm_index_start)*N_rho;
@@ -297,31 +315,58 @@ int main(int argc, char *argv[]) {
         lower_offdiag_unitary_inv_stack+offset_in_offidag_unitary_stack,
         upper_offdiag_unitary_inv_stack+offset_in_offidag_unitary_stack,
         wf_lm, wf_lm_mid, N_rho);
-
-    //// Evaulate tsurff-related values
-    //
-    //// end
-      
+  
     }
     //// Logging
     if (((time_index + 1) % num_of_steps_to_print_progress) == 0) {
-      num_of_steps_done_so_far = time_index - start_time_index;
+      num_of_steps_done_so_far = time_index - start_time_index + 1;
       if (rank == 0) {
         fprintf(stdout, "[@rank=%d][ LOG ] num_of_steps_done_so_far = %ld / %ld\n", 
-            rank, num_of_steps_done_so_far+1, num_of_time_steps);
-//        std::cout << "[@rank=" << rank << "][ LOG ] num_of_steps_done_so_far = " << num_of_steps_done_so_far + 1 << " / " << num_of_time_steps << std::endl;
+            rank, num_of_steps_done_so_far, num_of_time_steps);
       }
     }
   }
   fprintf(stdout, "[@rank=%d][ LOG ] Propagation done\n", rank);
-//  std::cout << "[ LOG ] Propagation done\n";
+
+  //// Write tsurff-quantities to files 
+  MPI_Datatype block_type, element_type;
+  element_type = MPI::DOUBLE_COMPLEX;
+  MPI_Type_vector(num_of_time_steps, num_of_wf_to_read, num_of_wf_lm, element_type, &block_type);
+  MPI_Type_commit(&block_type);
+
+  int element_type_size;
+  MPI_Type_size(element_type, &element_type_size);
+  MPI_Offset disp, end_position;
+  disp = rank * num_of_wf_per_proc * element_type_size;
+  MPI_Status write_status;
+  MPI_File tsurff_psi_raw_file, tsurff_dpsidr_raw_file;
+
+  MPI_File_open(MPI_COMM_WORLD, "tsurffpsi.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_psi_raw_file);
+  MPI_File_get_position(tsurff_psi_raw_file, &end_position);
+  MPI_File_set_view(tsurff_psi_raw_file, end_position+disp, element_type, block_type, "native", MPI_INFO_NULL);
+  return_code = MPI_File_write(tsurff_psi_raw_file, psi_R_arr, tsurff_buffer_length, element_type, &write_status);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write"); }
+
+  MPI_File_open(MPI_COMM_WORLD, "tsurff-dpsidr.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_dpsidr_raw_file);
+  MPI_File_get_position(tsurff_dpsidr_raw_file, &end_position);
+  MPI_File_set_view(tsurff_dpsidr_raw_file, end_position+disp, element_type, block_type, "native", MPI_INFO_NULL);
+  return_code = MPI_File_write(tsurff_dpsidr_raw_file, dpsi_drho_R_arr, tsurff_buffer_length, element_type, &write_status);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write"); }
+
+//  for (i=0; i<tsurff_buffer_length; i++) {
+//    std::cout << psi_R_arr[i] << " ";
+//  } std::cout << std::endl;
+//  for (i=0; i<tsurff_buffer_length; i++) {
+//    std::cout << dpsi_drho_R_arr[i] << " ";
+//  } std::cout << std::endl;
+  
 
   //// Write wf data to a file
   return_code = MPI_File_open(MPI_COMM_WORLD, current_wf_bin_file_name.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_open"); }
 
-  MPI_Status write_status;
-  return_code = MPI_File_write_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, MPI::DOUBLE_COMPLEX, &write_status);
+  MPI_Status write_status_wf;
+  return_code = MPI_File_write_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, MPI::DOUBLE_COMPLEX, &write_status_wf);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write_at"); }
 
   //// Check `write_status` to confirm how many elements has been written
@@ -333,7 +378,7 @@ int main(int argc, char *argv[]) {
   //// MPI Finalization
   return_code = MPI_Finalize();
   if (return_code == MPI_SUCCESS) {
-    fprintf(stdout, "[ LOG ] MPI program has been finalized.\n");
+    fprintf(stdout, "[@rank=%d][ LOG ] MPI program has been finalized.\n", rank);
   } else {
     fprintf(stderr, "[ERROR] Something got wrong during finalization.\n");
     return -1;

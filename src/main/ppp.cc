@@ -62,6 +62,20 @@ int main(int argc, char *argv[]) {
   parameterListe para_ini("initial.param");
   parameterListe para_prop("propagate.param");
   parameterListe para_tsurff("tsurff.param");
+  
+
+
+  //// Get and set PPP configuation
+  bool use_ppp = false;
+  try { use_ppp = para_tsurff.getBool("use-ppp"); }
+  catch (std::exception&) {}
+  // Abort if `ppp` is not configured to run
+  if (!use_ppp) { 
+    fprintf(stderr, "[ERROR] `ppp` hasn't been configured to run.\nPlease set `use-ppp` in `tsurff.param` file to `1` to run it.\n");
+    return -1; 
+  }
+
+
 
   //// Declare variables
   grid g_prop;

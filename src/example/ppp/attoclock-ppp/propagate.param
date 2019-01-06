@@ -1,0 +1,17 @@
+imag-width double 150.0
+ell-grid-size long 25
+delta-t double 0.05
+
+max-electric-field-x-1 double 0.0533799
+omega-x-1 double 0.114
+num-cycles-x-1 double 2.0
+phase-pi-x-1 double 0.0
+
+max-electric-field-y-1 double 0.0533799
+omega-y-1 double 0.114
+num-cycles-y-1 double 2.0
+phase-pi-y-1 double 0.5*M_PI
+
+#max-electric-field double 0.0533799
+#omega double 0.114
+#num-cycles double 2.0

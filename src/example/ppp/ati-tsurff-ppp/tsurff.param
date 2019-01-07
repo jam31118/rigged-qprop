@@ -20,4 +20,4 @@ expansion-scheme long 2
 
 
 ## PPP parameters
-use-ppp bool 0
+use-ppp bool 1

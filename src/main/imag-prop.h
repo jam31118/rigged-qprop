@@ -16,6 +16,7 @@
 #include <smallHelpers.hh>
 #include "potentials.hh"
 #include "printer.hh"
+#include "common.hh"
 
 extern "C" int imag_prop(int argc, char **argv);
 

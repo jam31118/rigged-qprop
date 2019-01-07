@@ -1,0 +1,13 @@
+initial_wf_file_name  string  ini-wf.bin
+current_wf_file_name  string  current-wf.bin
+
+## imag-prop specific parameters
+imag_prop_common_prefix string  imag-prop
+max-num-of-imag-timesteps long  200000
+
+## real-prop specific parameters
+
+
+## tsurff specific parameters
+beyond-R  double  0.0
+

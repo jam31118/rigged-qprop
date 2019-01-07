@@ -27,6 +27,8 @@ int real_prop(int argc, char **argv) {
   parameterListe para_prop("propagate.param");
   parameterListe para_tsurff("tsurff.param");
 
+  parameterListe default_param = get_default_parameter_list_object(); 
+
 
   // Get some parameters from parameter files
   const int my_m_quantum_num = para_ini.getLong("initial-m");
@@ -152,7 +154,7 @@ int real_prop(int argc, char **argv) {
 
 
   // Load initial wavefunction from file
-  string initial_wf_file_name = string("ini-wf.bin"); // [NOTE] global variable
+  string initial_wf_file_name = default_param.getString("initial_wf_file_name"); // string("ini-wf.bin"); // [NOTE] global variable -> 180-716 done.
   std::ifstream initial_wf_file(initial_wf_file_name, std::ios::binary);
   if ( !initial_wf_file.is_open() ) {
     std::cerr << "[ERROR] Failed to read file: " << initial_wf_file_name << endl;
@@ -168,8 +170,9 @@ int real_prop(int argc, char **argv) {
   // [NOTE] 'start wavefunction' is different from 'initial wavefunction' if 'start_time_index' is not zero,
   // i.e. if the calculation doesn't start from zero (initial) time.
   string start_wf_file_name;
-  if (start_time_index == 0) { start_wf_file_name = initial_wf_file_name; } // [NOTE] global variable
-  else if (start_time_index > 0) { start_wf_file_name = string("current-wf.bin"); } // [NOTE] global variable
+  if (start_time_index == 0) { start_wf_file_name = initial_wf_file_name; }
+//  else if (start_time_index > 0) { start_wf_file_name = string("current-wf.bin"); } // [NOTE] global variable
+  else if (start_time_index > 0) { start_wf_file_name = default_param.getString("current_wf_bin_file_name"); } // [NOTE] global variable -> 180716 done.
   else {
     fprintf(stderr, "[ERROR] Unexpected 'start_time_index': %ld\n", start_time_index);
     return 1; }

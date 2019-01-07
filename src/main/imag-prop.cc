@@ -140,6 +140,7 @@ int imag_prop(int argc, char **argv) {
   wavefunction staticpot, E_i, wf;
 
   parameterListe para_ini("initial.param");
+  parameterListe default_param = get_default_parameter_list_object(); 
   
 //  double alpha;
 //  try { alpha = para_ini.getDouble("effpot-alpha"); }
@@ -169,12 +170,13 @@ int imag_prop(int argc, char **argv) {
   // 
 
   // Number of imaginary time steps
-  const double acc_tol = 1.0e-14;  // [NOTE] Global config
+  const double acc_tol = 1.0e-14;  // [NOTE] global config
 
   long max_num_of_timesteps_temp;
   try { max_num_of_timesteps_temp = para_ini.getLong("max-num-of-imag-timesteps"); }
-  catch (std::exception&) { max_num_of_timesteps_temp = 200000; }
-  const long lno_of_ts = max_num_of_timesteps_temp;  // [NOTE] Global config -- maximum number of timesteps
+  catch (std::exception&) { max_num_of_timesteps_temp = default_param.getLong("max-num-of-imag-timesteps"); }
+//  catch (std::exception&) { max_num_of_timesteps_temp = 200000; }
+  const long lno_of_ts = max_num_of_timesteps_temp;  // [NOTE] global config -- maximum number of timesteps
   fluid ell_init, m_init;
   ell_init.init(g.ngps_z());
   m_init.init(g.ngps_z());
@@ -211,7 +213,8 @@ int imag_prop(int argc, char **argv) {
   staticpot.calculate_staticpot(g, hamilton);
 
   // create some files with appropriate appendices
-  string common_prefix("imag-prop");  // [NOTE] should be in global config
+//  string common_prefix("imag-prop");  // [NOTE] should be in global config
+  string common_prefix = default_param.getString("imag_prop_common_prefix");
   string str_fname_logfi=common_prefix+string(".log");
   FILE* file_logfi = fopen_with_check(str_fname_logfi, "w");
 
@@ -376,8 +379,9 @@ int imag_prop(int argc, char **argv) {
 
 
   //// 180426 Added for split-time calc
-  string current_wf_bin_file_name = string("ini-wf.bin");
+  string current_wf_bin_file_name = default_param.getString("initial_wf_file_name");  // string("ini-wf.bin");
   std::ofstream current_wf_bin_file(current_wf_bin_file_name, std::ios::binary);
+  std::cout << "[ LOG ] current_wf_bin_file has been saved as: " << current_wf_bin_file_name << std::endl;
   wf_prop.dump_to_file_binary(current_wf_bin_file);
   current_wf_bin_file.close();
   ////

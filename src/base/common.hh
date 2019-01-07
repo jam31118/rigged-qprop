@@ -5,6 +5,7 @@
 #include <string>
 #include <cstdlib>
 #include <unistd.h>
+#include <cmath>
 #include "parameter.hh"
 
 //#define CONFIG_CHAR_MAX_NUM 500
@@ -26,5 +27,6 @@ std::string get_default_parameter_file_path(void);
 parameterListe get_default_parameter_list_object(void);
 
 
+int get_ell_and_m_from_lm_index(long lm_index, long *p_ell, long *p_m, long initial_m, long qprop_dim);
 
 #endif // _COMMON_HH_

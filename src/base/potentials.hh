@@ -155,8 +155,11 @@ public:
     //
   };
   double operator()(long xindex, long yindex, long zindex, double time, grid g) {
+    return (*this)(xindex, yindex, zindex, time, g.ngps_x());
+  }
+  double operator()(long xindex, long yindex, long zindex, double time, long ngps_x) {
     if (ampl_im>1.0) {
-      const long imag_start=g.ngps_x()-imag_potential_width;
+      const long imag_start=ngps_x-imag_potential_width;
       if (xindex<imag_start)
 	return 0;
       else {

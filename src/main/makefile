@@ -8,7 +8,9 @@ real_bin = real-prop
 eval_bin = eval-tsurff
 eval_mpi_bin = eval-tsurff-mpi
 
-bin_list = $(imag_bin) $(real_bin) $(eval_bin) $(eval_mpi_bin)
+ppp_bin = ppp
+
+bin_list = $(imag_bin) $(real_bin) $(eval_bin) $(eval_mpi_bin) $(ppp_bin)
 
 MPICXX ?= $(CXX)
 
@@ -26,6 +28,9 @@ $(eval_bin) : libqprop.a eval-tsurff.cc eval-tsurff-main.cc
 $(eval_mpi_bin) : libqprop.a eval-tsurff-mpi.cc eval-tsurff-mpi-main.cc
 	$(MPICXX) $(optimargs) -std=c++0x eval-tsurff-mpi-main.cc eval-tsurff-mpi.cc -o $@ -I. -I$(QPROP_SRC)/base -lqprop -lm  $(gslargs) $(mpiargs) -L$(QPROP_SRC)/../lib/x86_64
 
+$(ppp_bin): libqprop.a libmatrix.a ppp.cc
+	$(CXX) -std=c++0x -o $@ ppp.cc $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS) $(mpiargs)
+
 
 install: $(bin_list)
 	if [ ! -d "$(QPROP_BIN)" ]; then mkdir $(QPROP_BIN); fi
@@ -33,6 +38,9 @@ install: $(bin_list)
 
 libqprop.a:
 	+$(MAKE) -C $(QPROP_SRC)/base/ 
+
+libmatrix.a:
+	+$(MAKE) install -C $(MATRIX_HOME)
 
 clean:
 	cd $(QPROP_SRC)/base/ && $(MAKE) clean

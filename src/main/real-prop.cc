@@ -98,13 +98,22 @@ int real_prop(int argc, char **argv) {
   }
 
 
+  //// Get and set PPP configuation
+  bool use_ppp = false;
+  try { use_ppp = para_tsurff.getBool("use-ppp"); }
+  catch (std::exception&) {}
+
   // How long do the slowest electrons have time to reach the t-SURFF boundary
   // [NOTE] Keep in mind that the electron doesn't have a position 
   // and there's no concept like 'reach somewhere' for the electron especially in this quantum treatment.
   const double time_surff=para_tsurff.getDouble("R-tsurff")/para_tsurff.getDouble("p-min-tsurff");
-  const double duration=pulse_duration+time_surff;
+  double duration = pulse_duration;
+  if (!use_ppp) { duration += time_surff; }
   cout << "[ LOG ] pulse_duration : " << pulse_duration << endl;
   cout << "[ LOG ] time_surff : " << time_surff << endl;
+  if (use_ppp) {
+    cout << "[ LOG ] Run `PPP` for `time_surff`\n";
+  }
   
   
   // The output files that will be created by `real-prop`
@@ -355,6 +364,9 @@ int real_prop(int argc, char **argv) {
     fprintf(stdout, "%s is written.\n", str_fname_logfi.c_str());
     fprintf(stdout, "%s is written.\n", str_fname_yield.c_str());
     fprintf(stdout, "Hasta la vista...\n");
+    if (use_ppp) {
+      cout << "[ LOG ] Run `PPP` for `time_surff`\n";
+    }
   };
 };
 //

@@ -26,7 +26,7 @@ For visualizing the calculation result by `rigged-qprop`, have a look at [visual
 # PPP : Paralleled Post Propagation
 Implemented for parallel computing, PPP routine boosts the post propagation, which is often essential for evaluating low-energy structure in momentum spectra through t-SURFF routine.
 
-After compilation along with this PPP support, check out the example using this routine, for example:
+[After compilation along with this PPP support](https://github.com/jam31118/rigged-qprop/wiki/Installation#getting-ppp-support), check out the example using this routine, for example:
 ``` bash
 cd $QPROP_HOME/src/example/ppp/attoclock-ppp
 bash ../run.sh

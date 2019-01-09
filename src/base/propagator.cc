@@ -1,5 +1,24 @@
 #include "propagator.hh"
 
+void evaluate_Numerov_boosted_CN_propagator_tridiags_for_sph_harm_basis_simple(long l, long sign, long N_rho, double Z, double delta_rho, double delta_t, double *rho_array, double *scalarpot, double *imagpot, std::complex<double> *unitary_tridiags[]) {
+  
+  //// Get handles from tridiags, which is an array of 1D array pointers
+  std::complex<double> *diag_unitary = unitary_tridiags[i_d];
+  std::complex<double> *lower_offdiag_unitary = unitary_tridiags[i_ld] + 1;
+  std::complex<double> *upper_offdiag_unitary = unitary_tridiags[i_ud];
+
+  //// Set offdiag's boundary conditions
+  lower_offdiag_unitary[-1] = 0.0;
+  upper_offdiag_unitary[N_rho-1] = 0.0;
+
+  //// Evaluate propagator
+  evaluate_Numerov_boosted_CN_propagator_tridiags_for_sph_harm_basis(
+      l, sign, N_rho, Z, delta_rho, delta_t, rho_array, scalarpot, imagpot, 
+      diag_unitary, lower_offdiag_unitary, upper_offdiag_unitary );
+}
+
+
+
 void evaluate_Numerov_boosted_CN_propagator_tridiags_for_sph_harm_basis(long l, long sign, long N_rho, double Z, double delta_rho, double delta_t, double *rho_array, double *scalarpot, double *imagpot, std::complex<double> *diag_unitary, std::complex<double> *lower_offdiag_unitary, std::complex<double> *upper_offdiag_unitary) {
   /* # Arguments
    * `scalarpot`, `imagpot`, `diag_unitary`: each of length `N_rho`

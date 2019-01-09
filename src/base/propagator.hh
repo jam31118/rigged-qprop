@@ -4,13 +4,13 @@
 #include <complex>
 #include <cstdlib>
 
-
+#include "tridiag-common.hh"
 //// Define mapping from index_name to integer as indices
-enum index_name { 
-  i_ld, // an index for lower offdiagonal array
-  i_ud, // an index for upper offdiagonal array
-  i_d, // an index for diagonal array
-};
+//enum index_name { 
+//  i_ld, // an index for lower offdiagonal array
+//  i_ud, // an index for upper offdiagonal array
+//  i_d, // an index for diagonal array
+//};
 
 
 //// Declare functions

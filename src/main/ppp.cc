@@ -72,6 +72,7 @@ int main(int argc, char *argv[]) {
 #endif
 
 
+
   //// Load parameter files for QPROP
   parameterListe para_ini("initial.param");
   parameterListe para_prop("propagate.param");
@@ -85,7 +86,8 @@ int main(int argc, char *argv[]) {
   catch (std::exception&) {}
   // Abort if `ppp` is not configured to run
   if (!use_ppp) { 
-    fprintf(stderr, "[ERROR] `ppp` hasn't been configured to run.\nPlease set `use-ppp` in `tsurff.param` file to `1` to run it.\n");
+    fprintf(stderr, "[ERROR][@rank=%d] `ppp` hasn't been configured to run.\n", rank);
+    fprintf(stderr, "[ERROR][@rank=%d] Please set `use-ppp` in `tsurff.param` file to `1` to run it.\n", rank);
     return -1; 
   }
 
@@ -221,18 +223,6 @@ int main(int argc, char *argv[]) {
 #endif
 
 
-  //// Allocate memory
-  // declare pointers for l-indenpendent, double arrays
-  rho_array = new double[N_rho];
-  scalarpot_array = new double[N_rho];
-  imagpot_array = new double[N_rho];
-  // declare pointers for l-denpendent, double arrays
-//  diag_unitary = new std::complex<double>[N_rho];
-//  lower_offdiag_unitary = new std::complex<double>[N_rho-1];
-//  upper_offdiag_unitary = new std::complex<double>[N_rho-1];
-//  diag_unitary_inv = new std::complex<double>[N_rho];
-//  lower_offdiag_unitary_inv = new std::complex<double>[N_rho-1];
-//  upper_offdiag_unitary_inv = new std::complex<double>[N_rho-1];
 
   //// Instatiating potential objects
   // Prepare scalarpot
@@ -244,7 +234,15 @@ int main(int argc, char *argv[]) {
   const long imag_potential_width=long(para_prop.getDouble("imag-width")/delta_rho);
   imagpot imaginarypot(imag_potential_width);
 
+
   //// Prepare l-indenepent arrays
+  //
+  // declare pointers for l-indenpendent, double arrays && allocation
+  rho_array = new double[N_rho];
+  scalarpot_array = new double[N_rho];
+  imagpot_array = new double[N_rho];
+
+  // fill out values
   double rho_value;
   for (i=0; i<N_rho; i++) {
     rho_value = delta_rho * (i+1);
@@ -252,6 +250,9 @@ int main(int argc, char *argv[]) {
     scalarpot_array[i] = atomic_potential(rho_value, 0, 0, 0, 0);
     imagpot_array[i] = imaginarypot(i, 0, 0, 0, N_rho);
   }
+
+
+
   
   //// Allocate memory for storing propagators for each `l` values
   std::complex<double> *tridiags_unitary_stack[NUM_OF_ARRAY_IN_TRIDIAGS], *tridiags_unitary_inv_stack[NUM_OF_ARRAY_IN_TRIDIAGS];
@@ -261,32 +262,13 @@ int main(int argc, char *argv[]) {
     tridiags_unitary_inv_stack[i] = new std::complex<double>[N_rho * num_of_wf_to_read];
     if (tridiags_unitary_inv_stack[i] == NULL) { return error_and_exit(rank, EXIT_FAILURE, "malloc"); }
   }
-  std::complex<double> *diag_unitary_stack = tridiags_unitary_stack[i_d];
-  std::complex<double> *lower_offdiag_unitary_stack = tridiags_unitary_stack[i_ld];
-  std::complex<double> *upper_offdiag_unitary_stack = tridiags_unitary_stack[i_ud];
-  std::complex<double> *diag_unitary_inv_stack = tridiags_unitary_inv_stack[i_d];
-  std::complex<double> *lower_offdiag_unitary_inv_stack = tridiags_unitary_inv_stack[i_ld];
-  std::complex<double> *upper_offdiag_unitary_inv_stack = tridiags_unitary_inv_stack[i_ud];
-//  std::complex<double> *diag_unitary_stack = new std::complex<double>[N_rho * num_of_wf_to_read];
-//  std::complex<double> *lower_offdiag_unitary_stack = new std::complex<double>[(N_rho-1) * num_of_wf_to_read];
-//  std::complex<double> *upper_offdiag_unitary_stack = new std::complex<double>[(N_rho-1) * num_of_wf_to_read];
-//  std::complex<double> *diag_unitary_inv_stack = new std::complex<double>[N_rho * num_of_wf_to_read];
-//  std::complex<double> *lower_offdiag_unitary_inv_stack = new std::complex<double>[(N_rho-1) * num_of_wf_to_read];
-//  std::complex<double> *upper_offdiag_unitary_inv_stack = new std::complex<double>[(N_rho-1) * num_of_wf_to_read];
-
-
 
 
   //// Store propagators to each stacks
-  long offset_in_diag_unitary_stack;
-  long offset_in_offidag_unitary_stack;
-  long diag_length;
-  long offdiag_length;
-  diag_length = N_rho;
-  offdiag_length = N_rho;
+  // Prepare some variables
   long lm_index_offset;
   std::complex<double> *tridiags_unitary[NUM_OF_ARRAY_IN_TRIDIAGS], *tridiags_unitary_inv[NUM_OF_ARRAY_IN_TRIDIAGS];
-  //// Start storing
+  // Start storing
   for (lm_index=lm_index_start; lm_index<lm_index_max; ++lm_index) {
 
     //// Retrieve `l` and `m` quantum numbers
@@ -303,49 +285,23 @@ int main(int argc, char *argv[]) {
     for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) { 
       tridiags_unitary[i] = tridiags_unitary_stack[i] + lm_index_offset * N_rho; 
     }
-//    diag_unitary = diag_unitary_stack + lm_index_offset * diag_length;
-//    lower_offdiag_unitary = lower_offdiag_unitary_stack + lm_index_offset * offdiag_length;
-//    upper_offdiag_unitary = upper_offdiag_unitary_stack + lm_index_offset * offdiag_length;
     sign = -1;
     evaluate_Numerov_boosted_CN_propagator_tridiags_for_sph_harm_basis_simple(
         l,sign,N_rho,Z,delta_rho,delta_t,rho_array,scalarpot_array,imagpot_array,tridiags_unitary);
-//    evaluate_Numerov_boosted_CN_propagator_tridiags_for_sph_harm_basis(
-//        l,sign,N_rho,Z,delta_rho,delta_t,rho_array,scalarpot_array,imagpot_array,
-//        diag_unitary,lower_offdiag_unitary,upper_offdiag_unitary);
 
     // sign = 1 for implicit half time propagation
     for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) { 
       tridiags_unitary_inv[i] = tridiags_unitary_inv_stack[i] + lm_index_offset * N_rho; 
     }
-//    diag_unitary_inv = diag_unitary_inv_stack + lm_index_offset * diag_length;
-//    lower_offdiag_unitary_inv = lower_offdiag_unitary_inv_stack + lm_index_offset * offdiag_length;
-//    upper_offdiag_unitary_inv = upper_offdiag_unitary_inv_stack + lm_index_offset * offdiag_length;
     sign = 1;
     evaluate_Numerov_boosted_CN_propagator_tridiags_for_sph_harm_basis_simple(
         l,sign,N_rho,Z,delta_rho,delta_t,rho_array,scalarpot_array,imagpot_array,tridiags_unitary_inv);
-//    evaluate_Numerov_boosted_CN_propagator_tridiags_for_sph_harm_basis(
-//        l,sign,N_rho,Z,delta_rho,delta_t,rho_array,scalarpot_array,imagpot_array,
-//        diag_unitary_inv,lower_offdiag_unitary_inv,upper_offdiag_unitary_inv);
-
-    //// Store it to stack
-//g    offset_in_diag_unitary_stack = (lm_index-lm_index_start)*N_rho;
-//g    offset_in_offidag_unitary_stack = (lm_index-lm_index_start)*(N_rho-1);
-//g    std::copy(diag_unitary, diag_unitary+diag_length, 
-//g        diag_unitary_stack+offset_in_diag_unitary_stack);
-//g    std::copy(lower_offdiag_unitary, lower_offdiag_unitary+offdiag_length, 
-//g        lower_offdiag_unitary_stack+offset_in_offidag_unitary_stack);
-//g    std::copy(upper_offdiag_unitary, upper_offdiag_unitary+offdiag_length, 
-//g        upper_offdiag_unitary_stack+offset_in_offidag_unitary_stack);
-//g    std::copy(diag_unitary_inv, diag_unitary_inv+diag_length, 
-//g        diag_unitary_inv_stack+offset_in_diag_unitary_stack);
-//g    std::copy(lower_offdiag_unitary_inv, lower_offdiag_unitary_inv+offdiag_length, 
-//g        lower_offdiag_unitary_inv_stack+offset_in_offidag_unitary_stack);
-//g    std::copy(upper_offdiag_unitary_inv, upper_offdiag_unitary_inv+offdiag_length, 
-//g        upper_offdiag_unitary_inv_stack+offset_in_offidag_unitary_stack);
   } 
 
-  std::cout << "[@rank=" << rank << "]" << "[ LOG ] all unitary propagator stored\n";
+  fprintf(stdout, "[ LOG ][@rank=%d] all unitary propagator stored\n", rank);
 
+
+  
   //// Set time index range for propagation
   long start_time_index = 0;
   double post_prop_duration = para_tsurff.getDouble("R-tsurff") / para_tsurff.getDouble("p-min-tsurff");
@@ -379,7 +335,6 @@ int main(int argc, char *argv[]) {
   long tsurff_buf_index;
 
   //// Start iteration over each `wf_lm` for `lm_index`
-//  long lm_index_from_zero;
   long num_of_steps_done_so_far, time_index_from_zero;
   long num_of_numbers_before_this_wf_lm;
   std::complex<double> *wf_lm = wf_read;
@@ -388,48 +343,34 @@ int main(int argc, char *argv[]) {
     time_index_from_zero = time_index - start_time_index;
     for (lm_index=lm_index_start; lm_index<lm_index_max; ++lm_index) {
       lm_index_offset = lm_index - lm_index_start;
-//      lm_index_from_zero = lm_index - lm_index_start;
+      
+
       //// Set wf_lm pointer
       num_of_numbers_before_this_wf_lm = lm_index_offset * num_of_numbers_per_wf;
       wf_lm = wf_read + num_of_numbers_before_this_wf_lm; 
     
+
       //// Evaulate tsurff-related values
       tsurff_buf_index = time_index_from_zero * num_of_wf_to_read + lm_index_offset;
       psi_R_arr[tsurff_buf_index] = wf_lm[index_at_R];
       dpsi_drho_R_arr[tsurff_buf_index] = two_over_3delta_rho*(wf_lm[index_at_R+1] - wf_lm[index_at_R-1]) - one_over_12delta_rho*(wf_lm[index_at_R+2]-wf_lm[index_at_R-2]);
-    //// end
 
 
-
-
-      //// Set offset in propagators stacks to select for the current `l` values
-//      offset_in_diag_unitary_stack = (lm_index-lm_index_start)*N_rho;
-//      offset_in_offidag_unitary_stack = (lm_index-lm_index_start)*(N_rho-1);
-  
       //// Propagate
-      // explicit half time propagation
+      //// explicit half time propagation
+      // Set offset in propagators stacks to select for the current `l` values
       for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) { 
         tridiags_unitary[i] = tridiags_unitary_stack[i] + lm_index_offset * N_rho; 
       }
-//      mat_vec_mul_tridiag(
-//          diag_unitary_stack+offset_in_diag_unitary_stack,
-//          lower_offdiag_unitary_stack+offset_in_offidag_unitary_stack,
-//          upper_offdiag_unitary_stack+offset_in_offidag_unitary_stack,
-//          wf_lm, wf_lm_mid, N_rho);
       tridiag_mul_forward(tridiags_unitary[i_ld], tridiags_unitary[i_d], tridiags_unitary[i_ud], wf_lm, wf_lm_mid, N_rho);
       
       // implicit half time propagation
       for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) { 
         tridiags_unitary_inv[i] = tridiags_unitary_inv_stack[i] + lm_index_offset * N_rho;
       }
-//      gaussian_elimination_tridiagonal(
-//          diag_unitary_inv_stack+offset_in_diag_unitary_stack,
-//          lower_offdiag_unitary_inv_stack+offset_in_offidag_unitary_stack,
-//          upper_offdiag_unitary_inv_stack+offset_in_offidag_unitary_stack,
-//          wf_lm, wf_lm_mid, N_rho);
       tridiag_mul_backward(tridiags_unitary_inv[i_ld], tridiags_unitary_inv[i_d], tridiags_unitary_inv[i_ud], wf_lm, wf_lm_mid, N_rho);
-    
     }
+
     //// Logging
     if (((time_index + 1) % num_of_steps_to_print_progress) == 0) {
       num_of_steps_done_so_far = time_index - start_time_index + 1;
@@ -438,8 +379,9 @@ int main(int argc, char *argv[]) {
             rank, num_of_steps_done_so_far, num_of_time_steps);
       }
     }
+
   }
-  fprintf(stdout, "[@rank=%d][ LOG ] Propagation done\n", rank);
+  fprintf(stdout, "[ LOG ][@rank=%d] Propagation done\n", rank);
 
 
 

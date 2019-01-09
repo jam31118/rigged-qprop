@@ -2,7 +2,7 @@
 num_of_process=4
 $QPROP_HOME/bin/imag-prop
 $QPROP_HOME/bin/real-prop
-$QPROP_DEP_DIR/openmpi/bin/mpiexec -n $num_of_process $QPROP_HOME/bin/ppp
+$QPROP_DEP_DIR/openmpi/bin/mpiexec -n $num_of_process $QPROP_HOME/bin/ppp-mpi
 $QPROP_DEP_DIR/openmpi/bin/mpiexec -n $num_of_process $QPROP_HOME/bin/eval-tsurff-mpi
 bash $QPROP_HOME/src/util/data/combine_tsurff_data.sh
 

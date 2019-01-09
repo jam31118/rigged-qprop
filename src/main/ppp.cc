@@ -15,12 +15,16 @@
 #include "matrix.hh"
 
 //// headers for MPI
+#ifdef HAVE_MPI 
 #include "mpi.h"
+#endif
 
 int error_and_exit(int rank, int return_code, const char *func_name) {
   fprintf(stderr, "In process with rank '%d': something got wrong in '%s' with return code: '%d'\n",
       rank, func_name, return_code);
+#ifdef HAVE_MPI 
   MPI_Finalize();
+#endif
   return return_code;
 }
 
@@ -29,17 +33,21 @@ int main(int argc, char *argv[]) {
   
   //// Declare variables with optional initialization
   int return_code = -1;
-  int num_of_process = -1, rank = -1;
+  int num_of_process = 1, rank = 0;  // default is a single-process mode
   
+#ifdef HAVE_MPI 
   //// MPI Initialization
   return_code = MPI_Init(&argc, &argv);
   if (return_code == MPI_SUCCESS) {
     fprintf(stdout, "[ LOG ] MPI program has been initialized.\n");
   } else {
     fprintf(stderr, "[ERROR] Something got wrong during initialization.\n");
-    return -1;
+    return return_code;
   }
+#endif
 
+
+#ifdef HAVE_MPI 
   //// Getting MPI communication size and process rank
   return_code = MPI_Comm_size(MPI_COMM_WORLD, &num_of_process);
   if (return_code != MPI_SUCCESS || num_of_process < 0) {
@@ -53,11 +61,16 @@ int main(int argc, char *argv[]) {
     MPI_Finalize();
     return -1;
   }
+#endif
 
+
+#ifdef HAVE_MPI
   //// MPI general configrations
   MPI_Datatype element_type;
   element_type = MPI::DOUBLE_COMPLEX;
-  
+#endif
+
+
   //// Load parameter files for QPROP
   parameterListe para_ini("initial.param");
   parameterListe para_prop("propagate.param");
@@ -114,15 +127,29 @@ int main(int argc, char *argv[]) {
   //// Configure wf file 
   // open file
   string current_wf_bin_file_name = string("current-wf.bin");
+#ifdef HAVE_MPI
   MPI_File fh;
   return_code = MPI_File_open(MPI_COMM_WORLD, current_wf_bin_file_name.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_open"); }
+#else
+  std::fstream fh;
+  fh.open(current_wf_bin_file_name, std::ios::in | std::ios::binary);
+  if (!fh.is_open()) { fprintf(stderr,"[ERROR] during opening file `%s`\n", current_wf_bin_file_name.c_str()); }
+#endif
+
 
   // Get file size
+#ifdef HAVE_MPI
   MPI_Offset file_size;
   return_code = MPI_File_get_size(fh, &file_size);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_get_size"); }
   if (rank == 0) { fprintf(stdout, "[@rank=%d] The size of file '%s' = %lld\n", rank, current_wf_bin_file_name.c_str(), file_size); }
+#else
+  long file_size;
+  fh.seekg(0, fh.end);
+  file_size = fh.tellg();
+  fh.seekg(0, fh.beg);
+#endif
   long current_wf_file_size = file_size;
 
   // Determine the number of basis wf (i.e. `wf_lm`) in the wf file
@@ -167,15 +194,31 @@ int main(int argc, char *argv[]) {
   std::cout << "[@rank=" << rank << "]" << "[ LOG ] offset_lm = " << offset_lm << std::endl;
   std::cout << "[@rank=" << rank << "]" << "[ LOG ] bytes_per_wf = " << bytes_per_wf << std::endl;
 
+
   //// Read wf data from file
   std::complex<double> *wf_read = new std::complex<double>[N_rho * num_of_wf_to_read];
+#ifdef HAVE_MPI
   MPI_Status read_status;
   return_code = MPI_File_read_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, MPI::DOUBLE_COMPLEX, &read_status);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_read_at"); }
+#else
+  fh.read((char *) wf_read, N_rho * num_of_wf_to_read * sizeof(std::complex<double>));
+  if (!fh) { 
+    fprintf(stderr, "[ERROR] only `%ld` elements could be read\n", fh.gcount());
+    fh.close();
+    return -1;
+  }
+#endif
 
-  // Close file
+
+  //// Close file
+#ifdef HAVE_MPI
   return_code = MPI_File_close(&fh);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_close"); }
+#else
+  fh.close();
+#endif
+
 
   //// Allocate memory
   // declare pointers for l-indenpendent, double arrays
@@ -348,6 +391,8 @@ int main(int argc, char *argv[]) {
 
 
   //// Write tsurff-quantities to files 
+  string tsurff_psi_raw_file_name("tsurffpsi.raw"), tsurff_dpsidr_raw_file_name("tsurff-dpsidr.raw");
+#ifdef HAVE_MPI
   // Define a MPI data type
   // : an array of blocks corresponding to each process, 
   // : thus separated with a certain interval
@@ -378,15 +423,40 @@ int main(int argc, char *argv[]) {
   MPI_File_set_view(tsurff_psi_raw_file, end_position+disp, element_type, block_type, "native", MPI_INFO_NULL);
   return_code = MPI_File_write(tsurff_psi_raw_file, psi_R_arr, tsurff_buffer_length, element_type, &write_status);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write"); }
+  return_code = MPI_File_close(&tsurff_psi_raw_file);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_close"); }
   // This is for `tsurff-dpsidr.raw`
   MPI_File_open(MPI_COMM_WORLD, "tsurff-dpsidr.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_dpsidr_raw_file);
   MPI_File_get_position(tsurff_dpsidr_raw_file, &end_position);
   MPI_File_set_view(tsurff_dpsidr_raw_file, end_position+disp, element_type, block_type, "native", MPI_INFO_NULL);
   return_code = MPI_File_write(tsurff_dpsidr_raw_file, dpsi_drho_R_arr, tsurff_buffer_length, element_type, &write_status);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write"); }
+  return_code = MPI_File_close(&tsurff_dpsidr_raw_file);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_close"); }
+
+#else
+
+  std::ofstream tsurff_psi_raw_file, tsurff_dpsidr_raw_file;
+  // This is for `tsurffpsi.raw`
+  tsurff_psi_raw_file.open(tsurff_psi_raw_file_name, std::ios::app | std::ios::binary);
+  if (!tsurff_psi_raw_file.is_open()) { fprintf(stderr,"[ERROR] during opening file `%s`\n", tsurff_psi_raw_file_name.c_str()); }
+  tsurff_psi_raw_file.write((char *) psi_R_arr, tsurff_buffer_length * sizeof(std::complex<double>));
+  if(!tsurff_psi_raw_file || tsurff_psi_raw_file.fail()) { fprintf(stderr, "[ERROR] during writing `psi_R_arr` to file `tsurffpsi.raw`\n"); return -1; }
+  else { fprintf(stdout, "[ LOG ] `%ld` elements has been written to file `%s`\n", tsurff_buffer_length, tsurff_psi_raw_file_name.c_str()); }
+  tsurff_psi_raw_file.close();
+  // This is for `tsurff-dpsidr.raw`
+  tsurff_dpsidr_raw_file.open(tsurff_dpsidr_raw_file_name, std::ios::app | std::ios::binary);
+  if (!tsurff_dpsidr_raw_file.is_open()) { fprintf(stderr,"[ERROR] during opening file `%s`\n", tsurff_dpsidr_raw_file_name.c_str()); }
+  tsurff_dpsidr_raw_file.write((char *) dpsi_drho_R_arr, tsurff_buffer_length * sizeof(std::complex<double>));
+  if(!tsurff_dpsidr_raw_file || tsurff_dpsidr_raw_file.fail()) { fprintf(stderr, "[ERROR] during writing `dpsi_drho_R_arr` to file `tsurff-dpsidr.raw`\n"); return -1; }
+  else { fprintf(stdout, "[ LOG ] `%ld` elements has been written to file `%s`\n", tsurff_buffer_length, tsurff_dpsidr_raw_file_name.c_str()); }
+  tsurff_dpsidr_raw_file.close();
+
+#endif
 
 
   //// Write wf data to a file
+#ifdef HAVE_MPI
   // Open file
   return_code = MPI_File_open(MPI_COMM_WORLD, current_wf_bin_file_name.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_open"); }
@@ -400,16 +470,31 @@ int main(int argc, char *argv[]) {
   // Close file
   return_code = MPI_File_close(&fh);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_close"); }
+#else
+  fh.open(current_wf_bin_file_name.c_str(), std::ios::out | std::ios::binary);
+  if (!fh.is_open()) { fprintf(stderr,"[ERROR] during opening file `%s`\n", current_wf_bin_file_name.c_str()); }
+  fh.write((char *) wf_read, N_rho * num_of_wf_to_read * sizeof(std::complex<double>));
+  if (!fh) { 
+    fprintf(stderr, "[ERROR] during writing statefunction into file `%s`\n", current_wf_bin_file_name.c_str());
+    fh.close();
+    return EXIT_FAILURE;
+  }
+  fh.close();
+#endif
+
+
 
   //// MPI Finalization
+#ifdef HAVE_MPI
   return_code = MPI_Finalize();
   if (return_code == MPI_SUCCESS) {
     fprintf(stdout, "[@rank=%d][ LOG ] MPI program has been finalized.\n", rank);
   } else {
     fprintf(stderr, "[ERROR] Something got wrong during finalization.\n");
-    return -1;
+    return EXIT_FAILURE;
   }
+#endif
 
   //// End this program
-  return 0;
+  return EXIT_SUCCESS;
 }

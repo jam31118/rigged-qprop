@@ -8,7 +8,7 @@ MPIHOME=$(LIBHOME)/openmpi/
 BOOSTHOME=$(LIBHOME)/boost/
 
 gslargs=-I$(GSLHOME)/include -L$(GSLHOME)/lib -lgsl -lgslcblas
-mpiargs=-I$(MPIHOME)/include -L$(MPIHOME)/lib -lmpi -lmpi_cxx -DHAVE_MPI
+mpiargs=-I$(MPIHOME)/include -L$(MPIHOME)/lib -lmpi -lmpi_cxx
 boostargs=-I$(BOOSTHOME)/include -L$(BOOSTHOME)/lib
 
 QPROP_FLAGS = -L$(QPROP_HOME)/lib/x86_64 -I$(QPROP_HOME)/src/base -lqprop

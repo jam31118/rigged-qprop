@@ -30,69 +30,68 @@
 #include "tridiag-common.hh"
 
 // Argument set
-int crank_nicolson_with_tsurff(int index_at_R, double delta_rho, int start_time_index, int num_of_time_steps, std::complex<double> *wf_read, int num_of_wf_to_read, std::complex<double> *psi_R_arr, std::complex<double> *dpsi_drho_R_arr, long N_rho, std::complex<double> *tridiags_unitary_stack[], std::complex<double> *tridiags_unitary_inv_stack[], int num_of_steps_to_print_progress, int rank) {
+int crank_nicolson_with_tsurff(
+    int index_at_R, double delta_rho, int start_time_index, int num_of_time_steps, 
+    std::complex<double> *wf_read, int num_of_wf_lm, 
+    std::complex<double> *psi_R_arr, std::complex<double> *dpsi_drho_R_arr, long N_rho, 
+    std::complex<double> *tridiags_unitary_stack[], std::complex<double> *tridiags_unitary_inv_stack[], 
+    int num_of_steps_to_print_progress, int rank) 
+{
   
-  
+
   //// Declare/Define intermediate variables
-  int i;
+  
+  // time varialbes
   int time_index;
   int time_index_max = start_time_index + num_of_time_steps;
+  long num_of_steps_done_so_far, time_index_from_zero;
 
+  // lm-related variables
   int lm_index_offset, lm_index;
-
   int num_of_element_in_wf_lm = N_rho;
-  int num_of_wf_lm = num_of_wf_to_read; // `num_of_wf_to_read` should be changed to `num_of_wf_lm`
   int total_num_of_element_in_given_wf = num_of_element_in_wf_lm * num_of_wf_lm;
+  long num_of_numbers_before_this_wf_lm;
+  std::complex<double> *wf_lm = NULL, *wf_lm_mid = NULL;
 
-//  std::complex<double> *tridiags_unitary[NUM_OF_ARRAY_IN_TRIDIAGS], *tridiags_unitary_inv[NUM_OF_ARRAY_IN_TRIDIAGS];
-  
-  // variables for tsurff quantity evaluation
+  // tsurff quantity evaluation related variables
   const double one_over_12delta_rho = 1.0/(12.0*delta_rho);
   const double two_over_3delta_rho = 2.0/(3.0*delta_rho);
   int tsurff_buf_index;
   
 
+
   //// Start iteration over each `wf_lm` for `lm_index`
-  long num_of_steps_done_so_far, time_index_from_zero;
-  long num_of_numbers_before_this_wf_lm;
-  std::complex<double> *wf_lm = wf_read;
-//  std::complex<double> *wf_lm_mid = new std::complex<double>[N_rho];
-  std::complex<double> *wf_lm_mid = new std::complex<double>[total_num_of_element_in_given_wf];
-  for (time_index=start_time_index; time_index<time_index_max; ++time_index) {
-    time_index_from_zero = time_index - start_time_index;
-    for (lm_index_offset=0; lm_index_offset<num_of_wf_to_read; ++lm_index_offset) {
-//      lm_index_offset = lm_index - lm_index_start;
   
-      //// Set wf_lm pointer
+  // allocate memory for an intermediate array
+  wf_lm_mid = new std::complex<double>[total_num_of_element_in_given_wf];
+
+  // iterate over time
+  for (time_index=start_time_index; time_index<time_index_max; ++time_index) {
+
+    time_index_from_zero = time_index - start_time_index;
+
+    // iterate over `wf_lm`
+    for (lm_index_offset=0; lm_index_offset<num_of_wf_lm; ++lm_index_offset) {
+  
+      // Set wf_lm pointer
       num_of_numbers_before_this_wf_lm = lm_index_offset * N_rho;
       wf_lm = wf_read + num_of_numbers_before_this_wf_lm; 
-    
   
-      //// Evaulate tsurff-related values
-      tsurff_buf_index = time_index_from_zero * num_of_wf_to_read + lm_index_offset;
+      // Evaulate tsurff-related values
+      tsurff_buf_index = time_index_from_zero * num_of_wf_lm + lm_index_offset;
       psi_R_arr[tsurff_buf_index] = wf_lm[index_at_R];
       dpsi_drho_R_arr[tsurff_buf_index] = two_over_3delta_rho*(wf_lm[index_at_R+1] - wf_lm[index_at_R-1]) - one_over_12delta_rho*(wf_lm[index_at_R+2]-wf_lm[index_at_R-2]);
   
-  
-      //// Propagate
-      //// explicit half time propagation
-      // Set offset in propagators stacks to select for the current `l` values
-//      for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) { 
-//        tridiags_unitary[i] = tridiags_unitary_stack[i] + lm_index_offset * N_rho; 
-//      }
-//      tridiag_mul_forward(tridiags_unitary[i_ld], tridiags_unitary[i_d], tridiags_unitary[i_ud], wf_lm, wf_lm_mid, N_rho);
-      
-      // implicit half time propagation
-//      for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) { 
-//        tridiags_unitary_inv[i] = tridiags_unitary_inv_stack[i] + lm_index_offset * N_rho;
-//      }
-//      tridiag_mul_backward(tridiags_unitary_inv[i_ld], tridiags_unitary_inv[i_d], tridiags_unitary_inv[i_ud], wf_lm, wf_lm_mid, N_rho);
     }
 
 
+    //// Propagate
+    // explicit half time propagation
     tridiag_mul_forward(tridiags_unitary_stack[i_ld], tridiags_unitary_stack[i_d], tridiags_unitary_stack[i_ud], wf_read, wf_lm_mid, total_num_of_element_in_given_wf);
+    // implicit half time propagation
     tridiag_mul_backward(tridiags_unitary_inv_stack[i_ld], tridiags_unitary_inv_stack[i_d], tridiags_unitary_inv_stack[i_ud], wf_read, wf_lm_mid, total_num_of_element_in_given_wf);
   
+
     //// Logging
     if (((time_index + 1) % num_of_steps_to_print_progress) == 0) {
       num_of_steps_done_so_far = time_index_from_zero + 1;
@@ -101,7 +100,7 @@ int crank_nicolson_with_tsurff(int index_at_R, double delta_rho, int start_time_
             rank, num_of_steps_done_so_far, num_of_time_steps);
       }
     }
-  
+
   }
   
   //// Free memory from inside
@@ -114,7 +113,6 @@ int crank_nicolson_with_tsurff(int index_at_R, double delta_rho, int start_time_
 
 
 
-
 int error_and_exit(int rank, int return_code, const char *func_name) {
   fprintf(stderr, "In process with rank '%d': something got wrong in '%s' with return code: '%d'\n",
       rank, func_name, return_code);
@@ -123,6 +121,8 @@ int error_and_exit(int rank, int return_code, const char *func_name) {
 #endif
   return return_code;
 }
+
+
 
 //// `main` program starts here
 int main(int argc, char *argv[]) {
@@ -426,89 +426,18 @@ int main(int argc, char *argv[]) {
   std::complex<double> *dpsi_drho_R_arr = new std::complex<double>[tsurff_buffer_length];
   long index_at_R = g_prop.rindex(para_tsurff.getDouble("R-tsurff"));
 
-
-
-  //// Routine design
-  // Required header
-  // - tridiag-common.hh
-  // - matrix.hh
   
+
+  //// Propagate with tsurff quantity evaluation
   int return_code_prop = EXIT_FAILURE;
-  return_code_prop = crank_nicolson_with_tsurff(index_at_R, delta_rho, start_time_index, num_of_time_steps, wf_read, num_of_wf_to_read, psi_R_arr, dpsi_drho_R_arr, N_rho, tridiags_unitary_stack, tridiags_unitary_inv_stack, num_of_steps_to_print_progress, rank);
+  return_code_prop = crank_nicolson_with_tsurff (
+      index_at_R, delta_rho, start_time_index, num_of_time_steps, 
+      wf_read, num_of_wf_to_read, psi_R_arr, dpsi_drho_R_arr, N_rho, 
+      tridiags_unitary_stack, tridiags_unitary_inv_stack, 
+      num_of_steps_to_print_progress, rank );
   if (return_code_prop != EXIT_SUCCESS) { return error_and_exit(rank, return_code_prop, "crank_nicolson_with_tsurff"); }
-//  
-//  // Argument set
-//  long index_at_R, double delta_rho, long start_time_index, long time_index_max, std::complex<double> *wf_read, 
-//  std::complex<double> *psi_R_arr, std::complex<double> *dpsi_drho_R_arr, long N_rho, std::complex<double> *tridiags_unitary_stack, std::complex<double> *tridiags_unitary_inv_stack, long num_of_steps_to_print_progress;
-//
-//
-//  //// Declare/Define intermediate variables
-//  //
-//  // 
-////  long lm_index_offset;
-////  std::complex<double> *tridiags_unitary[NUM_OF_ARRAY_IN_TRIDIAGS], *tridiags_unitary_inv[NUM_OF_ARRAY_IN_TRIDIAGS];
-//
-//  // variables for tsurff quantity evaluation
-//  const double one_over_12delta_rho = 1.0/(12.0*delta_rho);
-//  const double two_over_3delta_rho = 2.0/(3.0*delta_rho);
-//  long tsurff_buf_index;
-//
-//
-//
-//
-//  //// Start iteration over each `wf_lm` for `lm_index`
-//  long num_of_steps_done_so_far, time_index_from_zero;
-//  long num_of_numbers_before_this_wf_lm;
-//  std::complex<double> *wf_lm = wf_read;
-//  std::complex<double> *wf_lm_mid = new std::complex<double>[N_rho];
-//  for (time_index=start_time_index; time_index<time_index_max; ++time_index) {
-//    time_index_from_zero = time_index - start_time_index;
-//    for (lm_index=lm_index_start; lm_index<lm_index_max; ++lm_index) {
-//      lm_index_offset = lm_index - lm_index_start;
-//      
-//
-//      //// Set wf_lm pointer
-//      num_of_numbers_before_this_wf_lm = lm_index_offset * N_rho;
-//      wf_lm = wf_read + num_of_numbers_before_this_wf_lm; 
-//    
-//
-//      //// Evaulate tsurff-related values
-//      tsurff_buf_index = time_index_from_zero * num_of_wf_to_read + lm_index_offset;
-//      psi_R_arr[tsurff_buf_index] = wf_lm[index_at_R];
-//      dpsi_drho_R_arr[tsurff_buf_index] = two_over_3delta_rho*(wf_lm[index_at_R+1] - wf_lm[index_at_R-1]) - one_over_12delta_rho*(wf_lm[index_at_R+2]-wf_lm[index_at_R-2]);
-//
-//
-//      //// Propagate
-//      //// explicit half time propagation
-//      // Set offset in propagators stacks to select for the current `l` values
-//      for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) { 
-//        tridiags_unitary[i] = tridiags_unitary_stack[i] + lm_index_offset * N_rho; 
-//      }
-//      tridiag_mul_forward(tridiags_unitary[i_ld], tridiags_unitary[i_d], tridiags_unitary[i_ud], wf_lm, wf_lm_mid, N_rho);
-//      
-//      // implicit half time propagation
-//      for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) { 
-//        tridiags_unitary_inv[i] = tridiags_unitary_inv_stack[i] + lm_index_offset * N_rho;
-//      }
-//      tridiag_mul_backward(tridiags_unitary_inv[i_ld], tridiags_unitary_inv[i_d], tridiags_unitary_inv[i_ud], wf_lm, wf_lm_mid, N_rho);
-//    }
-//
-//    //// Logging
-//    if (((time_index + 1) % num_of_steps_to_print_progress) == 0) {
-//      num_of_steps_done_so_far = time_index_from_zero + 1;
-//      if (rank == 0) {
-//        fprintf(stdout, "[@rank=%d][ LOG ] num_of_steps_done_so_far = %ld / %ld\n", 
-//            rank, num_of_steps_done_so_far, num_of_time_steps);
-//      }
-//    }
-//
-//  }
-//
-//  //// Free memory from inside
-//  free(wf_lm_mid);
-//
-//  //// END OF ROUTINE
-//
+
+
 
   //// Logging
   fprintf(stdout, "[ LOG ][@rank=%d] Propagation done\n", rank);

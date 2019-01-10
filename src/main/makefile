@@ -54,7 +54,7 @@ libmatrix.a:
 libcu_propagator.so:
 	+$(MAKE) install -C $(CU_PROP_HOME)
 
-clean:
+clean: clean-bin
 	cd $(QPROP_SRC)/base/ && $(MAKE) clean
 	rm -f $(QPROP_SRC)/lib/x86_64/libqprop.a
 

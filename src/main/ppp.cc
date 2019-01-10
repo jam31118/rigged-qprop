@@ -369,14 +369,24 @@ int main(int argc, char *argv[]) {
   int block_dim3_in[3] = { num_of_thread_per_block, 1, 1 }, 
       grid_dim3_in[3] = { num_of_blocks, 1, 1 };
 
+  int batch_stride = N_rho;
+
   // running with gpu
-  return_code_prop = tridiag_forward_backward (
-    N_rho, tridiags_unitary_stack, tridiags_unitary_inv_stack, wf_read_aug, 
-    start_time_index, time_index_max,
-    block_dim3_in, grid_dim3_in, 
-    num_of_wf_to_read, N_rho);
+  return_code_prop = cu_crank_nicolson_with_tsurff (
+    index_at_R, delta_rho, start_time_index, num_of_time_steps,
+    wf_read_aug, num_of_wf_to_read,
+    psi_R_arr, dpsi_drho_R_arr, N_rho,
+    tridiags_unitary_stack, tridiags_unitary_inv_stack, 
+    num_of_steps_to_print_progress, rank,
+    block_dim3_in, grid_dim3_in, batch_stride);
+
+//  return_code_prop = tridiag_forward_backward (
+//    N_rho, tridiags_unitary_stack, tridiags_unitary_inv_stack, wf_read_aug, 
+//    start_time_index, time_index_max,
+//    block_dim3_in, grid_dim3_in, 
+//    num_of_wf_to_read, N_rho);
   if (return_code_prop != EXIT_SUCCESS) { 
-    fprintf(stderr, "[ERROR] Abnormal exit from `tridiag_forward_backward()`\n"); 
+    fprintf(stderr, "[ERROR] Abnormal exit from `cu_crank_nicolson_with_tsurff()`\n"); 
     return return_code_prop; 
   }
 #else

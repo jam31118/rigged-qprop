@@ -40,19 +40,24 @@ int crank_nicolson_with_tsurff(int index_at_R, double delta_rho, int start_time_
 
   int lm_index_offset, lm_index;
 
-  std::complex<double> *tridiags_unitary[NUM_OF_ARRAY_IN_TRIDIAGS], *tridiags_unitary_inv[NUM_OF_ARRAY_IN_TRIDIAGS];
+  int num_of_element_in_wf_lm = N_rho;
+  int num_of_wf_lm = num_of_wf_to_read; // `num_of_wf_to_read` should be changed to `num_of_wf_lm`
+  int total_num_of_element_in_given_wf = num_of_element_in_wf_lm * num_of_wf_lm;
+
+//  std::complex<double> *tridiags_unitary[NUM_OF_ARRAY_IN_TRIDIAGS], *tridiags_unitary_inv[NUM_OF_ARRAY_IN_TRIDIAGS];
   
   // variables for tsurff quantity evaluation
   const double one_over_12delta_rho = 1.0/(12.0*delta_rho);
   const double two_over_3delta_rho = 2.0/(3.0*delta_rho);
   int tsurff_buf_index;
   
-    
+
   //// Start iteration over each `wf_lm` for `lm_index`
   long num_of_steps_done_so_far, time_index_from_zero;
   long num_of_numbers_before_this_wf_lm;
   std::complex<double> *wf_lm = wf_read;
-  std::complex<double> *wf_lm_mid = new std::complex<double>[N_rho];
+//  std::complex<double> *wf_lm_mid = new std::complex<double>[N_rho];
+  std::complex<double> *wf_lm_mid = new std::complex<double>[total_num_of_element_in_given_wf];
   for (time_index=start_time_index; time_index<time_index_max; ++time_index) {
     time_index_from_zero = time_index - start_time_index;
     for (lm_index_offset=0; lm_index_offset<num_of_wf_to_read; ++lm_index_offset) {
@@ -72,17 +77,21 @@ int crank_nicolson_with_tsurff(int index_at_R, double delta_rho, int start_time_
       //// Propagate
       //// explicit half time propagation
       // Set offset in propagators stacks to select for the current `l` values
-      for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) { 
-        tridiags_unitary[i] = tridiags_unitary_stack[i] + lm_index_offset * N_rho; 
-      }
-      tridiag_mul_forward(tridiags_unitary[i_ld], tridiags_unitary[i_d], tridiags_unitary[i_ud], wf_lm, wf_lm_mid, N_rho);
+//      for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) { 
+//        tridiags_unitary[i] = tridiags_unitary_stack[i] + lm_index_offset * N_rho; 
+//      }
+//      tridiag_mul_forward(tridiags_unitary[i_ld], tridiags_unitary[i_d], tridiags_unitary[i_ud], wf_lm, wf_lm_mid, N_rho);
       
       // implicit half time propagation
-      for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) { 
-        tridiags_unitary_inv[i] = tridiags_unitary_inv_stack[i] + lm_index_offset * N_rho;
-      }
-      tridiag_mul_backward(tridiags_unitary_inv[i_ld], tridiags_unitary_inv[i_d], tridiags_unitary_inv[i_ud], wf_lm, wf_lm_mid, N_rho);
+//      for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) { 
+//        tridiags_unitary_inv[i] = tridiags_unitary_inv_stack[i] + lm_index_offset * N_rho;
+//      }
+//      tridiag_mul_backward(tridiags_unitary_inv[i_ld], tridiags_unitary_inv[i_d], tridiags_unitary_inv[i_ud], wf_lm, wf_lm_mid, N_rho);
     }
+
+
+    tridiag_mul_forward(tridiags_unitary_stack[i_ld], tridiags_unitary_stack[i_d], tridiags_unitary_stack[i_ud], wf_read, wf_lm_mid, total_num_of_element_in_given_wf);
+    tridiag_mul_backward(tridiags_unitary_inv_stack[i_ld], tridiags_unitary_inv_stack[i_d], tridiags_unitary_inv_stack[i_ud], wf_read, wf_lm_mid, total_num_of_element_in_given_wf);
   
     //// Logging
     if (((time_index + 1) % num_of_steps_to_print_progress) == 0) {

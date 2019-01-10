@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Compilation
-make ppp -C $QPROP_HOME/src/main
+make -j4 ppp -C $QPROP_HOME/src/main
 make_success="$?"
 if [ "$make_success" -ne "0" ]; then echo "[ERROR] during 'make'"; exit -1; fi
 

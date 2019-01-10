@@ -2,6 +2,7 @@ QPROP_SRC = $(QPROP_HOME)/src
 QPROP_BIN = $(QPROP_HOME)/bin
 
 include $(QPROP_SRC)/main/variables.mk
+include $(CU_PROP_HOME)/src/var.mk
 
 imag_bin = imag-prop
 real_bin = real-prop
@@ -10,8 +11,9 @@ eval_mpi_bin = eval-tsurff-mpi
 
 ppp_bin = ppp
 ppp_mpi_bin = ppp-mpi
+ppp_gpu_bin = ppp-gpu
 
-bin_list = $(imag_bin) $(real_bin) $(eval_bin) $(eval_mpi_bin) $(ppp_bin) $(ppp_mpi_bin)
+bin_list = $(imag_bin) $(real_bin) $(eval_bin) $(eval_mpi_bin) $(ppp_bin) $(ppp_mpi_bin) $(ppp_gpu_bin)
 
 MPICXX ?= $(CXX)
 
@@ -29,11 +31,14 @@ $(eval_bin) : libqprop.a eval-tsurff.cc eval-tsurff-main.cc
 $(eval_mpi_bin) : libqprop.a eval-tsurff-mpi.cc eval-tsurff-mpi-main.cc
 	$(MPICXX) $(optimargs) -std=c++0x eval-tsurff-mpi-main.cc eval-tsurff-mpi.cc -o $@ -I. -I$(QPROP_SRC)/base -lqprop -lm  $(gslargs) $(mpiargs) -DHAVE_MPI -L$(QPROP_SRC)/../lib/x86_64
 
-$(ppp_bin): libqprop.a libmatrix.a ppp.cc
-	$(CXX) -std=c++0x -o $@ ppp.cc $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS)
+$(ppp_bin): ppp.cc libqprop.a libmatrix.a 
+	$(CXX) -std=c++0x $< -o $@ $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS)
 
-$(ppp_mpi_bin): libqprop.a libmatrix.a ppp.cc
-	$(CXX) -std=c++0x -o $@ ppp.cc $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS) $(mpiargs) -DHAVE_MPI
+$(ppp_mpi_bin): ppp.cc libqprop.a libmatrix.a
+	$(CXX) -std=c++0x $< -o $@ $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS) $(mpiargs) -DHAVE_MPI
+
+$(ppp_gpu_bin): ppp.cc libqprop.a libmatrix.a libcu_propagator.so
+	$(CXX) -std=c++0x $< -o $@ $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS) $(CU_PROP_FLAGS) $(CUDA_LIB_FLAGS) -DHAVE_CUDA
 
 
 install: $(bin_list)
@@ -45,6 +50,9 @@ libqprop.a:
 
 libmatrix.a:
 	+$(MAKE) install -C $(MATRIX_HOME)
+
+libcu_propagator.so:
+	+$(MAKE) install -C $(CU_PROP_HOME)
 
 clean:
 	cd $(QPROP_SRC)/base/ && $(MAKE) clean

@@ -16,4 +16,7 @@ QPROP_FLAGS = -L$(QPROP_HOME)/lib/x86_64 -I$(QPROP_HOME)/src/base -lqprop
 MATRIX_HOME = $(QPROP_HOME)/dep/matrix
 MATRIX_FLAGS = -L$(MATRIX_HOME)/lib -I$(MATRIX_HOME)/include -lmatrix
 
+CU_PROP_HOME = $(QPROP_HOME)/dep/cu-tridiag
+CU_PROP_FLAGS = -L$(CU_PROP_HOME)/lib -I$(CU_PROP_HOME)/include -lcu_propagator
+
 

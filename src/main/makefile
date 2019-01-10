@@ -32,13 +32,13 @@ $(eval_mpi_bin) : libqprop.a eval-tsurff-mpi.cc eval-tsurff-mpi-main.cc
 	$(MPICXX) $(optimargs) -std=c++0x eval-tsurff-mpi-main.cc eval-tsurff-mpi.cc -o $@ -I. -I$(QPROP_SRC)/base -lqprop -lm  $(gslargs) $(mpiargs) -DHAVE_MPI -L$(QPROP_SRC)/../lib/x86_64
 
 $(ppp_bin): ppp.cc libqprop.a libmatrix.a 
-	$(CXX) -std=c++0x $< -o $@ $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS)
+	$(CXX) -std=c++0x $< -o $@ $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS) -DHAVE_BOOST
 
 $(ppp_mpi_bin): ppp.cc libqprop.a libmatrix.a
-	$(CXX) -std=c++0x $< -o $@ $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS) $(mpiargs) -DHAVE_MPI
+	$(CXX) -std=c++0x $< -o $@ $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS) $(mpiargs) -DHAVE_MPI -DHAVE_BOOST
 
 $(ppp_gpu_bin): ppp.cc libqprop.a libmatrix.a libcu_propagator.so
-	$(CXX) -std=c++0x $< -o $@ $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS) $(CU_PROP_FLAGS) $(CUDA_LIB_FLAGS) -DHAVE_CUDA
+	$(CXX) -std=c++0x $< -o $@ $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS) $(CU_PROP_FLAGS) $(CUDA_LIB_FLAGS) -DHAVE_CUDA -DHAVE_BOOST
 
 
 install: $(bin_list)

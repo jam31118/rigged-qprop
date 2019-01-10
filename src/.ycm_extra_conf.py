@@ -52,6 +52,8 @@ BASE_FLAGS = [
     #'-I./include',
     #'-I./module',
     #'-I./core'
+    '-I{}/boost/include'.format(environ['QPROP_DEP_DIR']),
+    '-DHAVE_BOOST',
 ]
 
 SOURCE_EXTENSIONS = [  

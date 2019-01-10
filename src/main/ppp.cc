@@ -25,6 +25,14 @@
 #include "cu_propagator.h"
 #endif
 
+//// header for time-measurement
+#include <chrono>
+//#ifdef HAVE_BOOST
+//#include <boost/timer.hpp>
+//#endif
+
+//// For time measurement
+//typedef std::chrono::high_resolution_clock Clock;
 
 // Define macro function
 #define MIN(x,y) ((x<y)?x:y)
@@ -355,7 +363,17 @@ int main(int argc, char *argv[]) {
   std::complex<double> *dpsi_drho_R_arr = new std::complex<double>[tsurff_buffer_length];
   long index_at_R = g_prop.rindex(para_tsurff.getDouble("R-tsurff"));
 
-  
+
+
+
+  std::chrono::_V2::system_clock::time_point prop_start_time, prop_end_time;
+  std::chrono::duration<double> elapsed_time_prop_total;
+//  int elapsed_time_prop_total = -1;
+//#ifdef HAVE_BOOST
+//  boost::timer tim;
+//#endif
+
+
 
   //// Propagate with tsurff quantity evaluation
   int return_code_prop = EXIT_FAILURE;
@@ -371,6 +389,12 @@ int main(int argc, char *argv[]) {
 
   int batch_stride = N_rho;
 
+
+//#ifdef HAVE_BOOST
+//    tim.restart();
+//#endif 
+  prop_start_time = std::chrono::high_resolution_clock::now();
+
   // running with gpu
   return_code_prop = cu_crank_nicolson_with_tsurff (
     index_at_R, delta_rho, start_time_index, num_of_time_steps,
@@ -379,6 +403,11 @@ int main(int argc, char *argv[]) {
     tridiags_unitary_stack, tridiags_unitary_inv_stack, 
     num_of_steps_to_print_progress, rank,
     block_dim3_in, grid_dim3_in, batch_stride);
+
+//#ifdef HAVE_BOOST
+//  elapsed_time_prop_total = tim.elapsed();
+//#endif // HAVE_BOOST
+  prop_end_time = std::chrono::high_resolution_clock::now();
 
 //  return_code_prop = tridiag_forward_backward (
 //    N_rho, tridiags_unitary_stack, tridiags_unitary_inv_stack, wf_read_aug, 
@@ -390,18 +419,37 @@ int main(int argc, char *argv[]) {
     return return_code_prop; 
   }
 #else
+
+//#ifdef HAVE_BOOST
+//    tim.restart();
+//#endif 
+  prop_start_time = std::chrono::high_resolution_clock::now();
+
   //// running for non-gpu case
   return_code_prop = crank_nicolson_with_tsurff (
       index_at_R, delta_rho, start_time_index, num_of_time_steps, 
       wf_read, num_of_wf_to_read, psi_R_arr, dpsi_drho_R_arr, N_rho, 
       tridiags_unitary_stack, tridiags_unitary_inv_stack, 
       num_of_steps_to_print_progress, rank );
+
+//#ifdef HAVE_BOOST
+//  elapsed_time_prop_total = tim.elapsed();
+//#endif // HAVE_BOOST
+  prop_end_time = std::chrono::high_resolution_clock::now();
+
   if (return_code_prop != EXIT_SUCCESS) { return error_and_exit(rank, return_code_prop, "crank_nicolson_with_tsurff"); }
 #endif // HAVE_CUDA
 
 
   //// Logging
   fprintf(stdout, "[ LOG ][@rank=%d] Propagation done\n", rank);
+
+  elapsed_time_prop_total =  prop_end_time - prop_start_time;
+  fprintf(stdout, "[ LOG ][@rank=%d] Elapsed time for propagation: `%f` seconds\n", rank, elapsed_time_prop_total.count());
+//#ifdef HAVE_BOOST
+//  cout << "time step took " << elapsed_time_prop_total.count() << " seconds" << endl;
+//  cout << "time step took " << tim.elapsed() << " seconds" << endl;
+//#endif
 
 
   //// Free arrays right after the propagation

@@ -15,10 +15,19 @@
 #include "matrix.hh"
 #include "tridiag-common.hh"
 
-//// headers for MPI
+//// header(s) for MPI
 #ifdef HAVE_MPI 
 #include "mpi.h"
 #endif
+
+//// header(s) for `ppp-gpu`
+#ifdef HAVE_CUDA
+#include "cu_propagator.h"
+#endif
+
+
+// Define macro function
+#define MIN(x,y) ((x<y)?x:y)
 
 
 
@@ -202,8 +211,19 @@ int main(int argc, char *argv[]) {
   std::cout << "[@rank=" << rank << "]" << "[ LOG ] bytes_per_wf = " << bytes_per_wf << std::endl;
 
 
+  //// Allocate memory for wavefunciton
+  int num_of_elements_in_wf_stack = N_rho * num_of_wf_to_read;
+  std::complex<double> *wf_read;
+#ifdef HAVE_CUDA
+  std::complex<double> *wf_read_aug;
+  wf_read_aug = new std::complex<double>[num_of_elements_in_wf_stack + 2];
+  wf_read_aug[0] = 0; wf_read_aug[num_of_elements_in_wf_stack - 1];
+  wf_read = wf_read_aug + 1;
+#else
+  wf_read = new std::complex<double>[num_of_elements_in_wf_stack];
+#endif
+
   //// Read wf data from file
-  std::complex<double> *wf_read = new std::complex<double>[N_rho * num_of_wf_to_read];
 #ifdef HAVE_MPI
   MPI_Status read_status;
   return_code = MPI_File_read_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, MPI::DOUBLE_COMPLEX, &read_status);
@@ -339,13 +359,35 @@ int main(int argc, char *argv[]) {
 
   //// Propagate with tsurff quantity evaluation
   int return_code_prop = EXIT_FAILURE;
+#ifdef HAVE_CUDA
+  // forward tridiagonal multiplication configuration
+  int num_of_thread_per_block = 128;
+  int num_of_blocks_max = 32;
+  int num_of_blocks = MIN((N_rho+num_of_thread_per_block-1)/num_of_thread_per_block, num_of_blocks_max);
+
+  // Define grid and block dimension
+  int block_dim3_in[3] = { num_of_thread_per_block, 1, 1 }, 
+      grid_dim3_in[3] = { num_of_blocks, 1, 1 };
+
+  // running with gpu
+  return_code_prop = tridiag_forward_backward (
+    N_rho, tridiags_unitary_stack, tridiags_unitary_inv_stack, wf_read_aug, 
+    start_time_index, time_index_max,
+    block_dim3_in, grid_dim3_in, 
+    num_of_wf_to_read, N_rho);
+  if (return_code_prop != EXIT_SUCCESS) { 
+    fprintf(stderr, "[ERROR] Abnormal exit from `tridiag_forward_backward()`\n"); 
+    return return_code_prop; 
+  }
+#else
+  //// running for non-gpu case
   return_code_prop = crank_nicolson_with_tsurff (
       index_at_R, delta_rho, start_time_index, num_of_time_steps, 
       wf_read, num_of_wf_to_read, psi_R_arr, dpsi_drho_R_arr, N_rho, 
       tridiags_unitary_stack, tridiags_unitary_inv_stack, 
       num_of_steps_to_print_progress, rank );
   if (return_code_prop != EXIT_SUCCESS) { return error_and_exit(rank, return_code_prop, "crank_nicolson_with_tsurff"); }
-
+#endif // HAVE_CUDA
 
 
   //// Logging
@@ -459,7 +501,11 @@ int main(int argc, char *argv[]) {
 
 
   //// Free arrays
+#ifdef HAVE_CUDA
+  free(wf_read_aug);
+#else
   free(wf_read);
+#endif
   free(psi_R_arr);
   free(dpsi_drho_R_arr);
 

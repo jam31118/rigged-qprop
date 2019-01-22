@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ## Set Batch Options
-#SBATCH --job-name=ppp
+#SBATCH --job-name=ppp-mpi
 
 #SBATCH --output=slurm.%x.%j.log
 

@@ -28,7 +28,7 @@
 //// header for time-measurement
 #include <chrono>
 
-// Define macro function
+//// Define macro function
 #define MIN(x,y) ((x<y)?x:y)
 
 
@@ -269,7 +269,7 @@ int main(int argc, char *argv[]) {
 
   if ( lm_index_max >= num_of_wf_lm * (num_of_process + 1) ) {
     fprintf(stderr, "[ERROR][@rank=%d] `lm_index_max` (=%d) should not exceed `num_of_wf_lm` (=%ld)\n", rank, lm_index_max, num_of_wf_lm);
-    return EXIT_FAILURE;
+    return error_and_exit(rank, EXIT_FAILURE, "`lm_index_max` check");
   } else {
     fprintf(stdout, "[ LOG ][@rank=%d] lm_index_start: %d / num_of_wf_to_read: %d\n", rank, lm_index_start, num_of_wf_to_read);
   }
@@ -302,7 +302,7 @@ int main(int argc, char *argv[]) {
 
   // Define MPI user-defined type for describing the wavefunction file
   MPI_Datatype vec_type_wf_file;
-  MPI_Type_vector(num_of_wf_to_read, N_rho, num_of_process, element_type, &vec_type_wf_file);
+  MPI_Type_vector(num_of_wf_to_read, N_rho, num_of_process * N_rho, element_type, &vec_type_wf_file);
   MPI_Type_commit(&vec_type_wf_file);
   
   // Apply the defined MPI Datatype to the wavefunction file
@@ -313,6 +313,17 @@ int main(int argc, char *argv[]) {
   MPI_Status read_status;
   return_code = MPI_File_read(fh, wf_read, num_of_elements_in_wf_stack, element_type, &read_status);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_read"); }
+  
+  // Get the number of elements that has been read from `MPI_File_read()`
+  int num_of_elements_read = -1;
+  return_code = MPI_Get_count(&read_status, element_type, &num_of_elements_read);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_Get_count"); }
+  
+  // Cehck whether all target elements has been successfully read from the target file
+  if (num_of_elements_read != num_of_elements_in_wf_stack) {
+    fprintf(stderr, "[ERROR][@rank=%d] Number of elements to be read (=%d) is different from the actual number of elements that has been read (=%d) from file `%s`\n", rank, num_of_elements_in_wf_stack, num_of_elements_read, current_wf_bin_file_name.c_str());
+    return error_and_exit(rank, EXIT_FAILURE, "MPI_File_read");
+  }
 
 
 //  MPI_Status read_status;
@@ -439,8 +450,8 @@ int main(int argc, char *argv[]) {
   long time_index;
   long num_of_steps_to_print_progress = 200; // [NOTE] to become global default config
   if (rank==0) {
-    fprintf(stdout, "[ LOG ][@rank=%d] num_of_time_steps: %ld", rank, num_of_time_steps);
-    fprintf(stdout, "[ LOG ][@rank=%d] post_prop_duration: %f", rank, post_prop_duration);
+    fprintf(stdout, "[ LOG ][@rank=%d] num_of_time_steps: %ld\n", rank, num_of_time_steps);
+    fprintf(stdout, "[ LOG ][@rank=%d] post_prop_duration: %.3f [a.u.]\n", rank, post_prop_duration);
   }
 
 
@@ -551,7 +562,7 @@ int main(int argc, char *argv[]) {
   
   // Define vector type for describing data strucutre for each time step
   MPI_Datatype vec_type_per_time_step;
-  MPI_Type_vector(num_of_wf_to_read, 1, num_of_process, element_type, &vec_type_per_time_step);
+  MPI_Type_vector(num_of_wf_to_read, 1, num_of_process * 1, element_type, &vec_type_per_time_step);
   MPI_Type_commit(&vec_type_per_time_step);
   
   
@@ -624,6 +635,15 @@ int main(int argc, char *argv[]) {
   MPI_Status write_status_wf;
   return_code = MPI_File_write_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, element_type, &write_status_wf);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write_at"); }
+
+  int num_of_elements_written = -1;
+  return_code = MPI_Get_count(&write_status_wf, element_type, &num_of_elements_written);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_Get_count"); }
+
+  if (num_of_elements_written != num_of_wf_to_read * N_rho) {
+    fprintf(stderr, "[ERROR][@rank=%d] Inconsistent writing file `%s`\n", rank, current_wf_bin_file_name.c_str());
+    return error_and_exit(rank, EXIT_FAILURE, "MPI_File_Write_at");
+  }
 
   // [NOTE] Check `write_status` to confirm how many elements has been written
 

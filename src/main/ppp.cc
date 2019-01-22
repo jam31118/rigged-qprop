@@ -140,7 +140,7 @@ int main(int argc, char *argv[]) {
   long i; // for iteration
   long sign; // a sign in unitary propagator (-1: forward, 1: backward propagation)
   long l, m, N_rho;
-  long lm_index; // iteration for lm_unifired index
+  int lm_index; // iteration for lm_unifired index
   double Z, delta_rho, delta_t, grid_size;
   // declare pointers for l-indenpendent, double arrays
   double 
@@ -175,13 +175,13 @@ int main(int argc, char *argv[]) {
   long num_of_wf_lm = g_prop.num_of_phi_lm();
   if (num_of_wf_lm < 0) { std::cerr << "[ERROR] during `g_prop.num_of_phi_lm()`\n"; return EXIT_FAILURE; }
   if (rank == 0) {
-    fprintf(stdout, "[ LOG ][@rank=%d] num_of_wf_lm = %d\n", rank, num_of_wf_lm);
+    fprintf(stdout, "[ LOG ][@rank=%d] num_of_wf_lm = %ld\n", rank, num_of_wf_lm);
   }
 //  std::cout << "[ LOG ] num_of_wf_lm = " << num_of_wf_lm << std::endl;
   const int num_of_remaining_wf = num_of_wf_lm % num_of_process;
 
 
-
+#ifdef HAVE_MPI
   //// Drop process that may be unused
   MPI_Group world_group;
   MPI_Comm_group(MPI_COMM_WORLD, &world_group);
@@ -203,7 +203,7 @@ int main(int argc, char *argv[]) {
     MPI_Finalize();
     return EXIT_SUCCESS;
   }
-
+#endif // HAVE_MPI
 
 
 
@@ -297,7 +297,7 @@ int main(int argc, char *argv[]) {
 
   if ( lm_index_max >= num_of_wf_lm * (num_of_process + 1) ) {
 //    std::cerr << "[ERROR] `lm_index_max` should not exceed `num_of_wf_lm`\n";
-    fprintf(stderr, "[ERROR][@rank=%d] `lm_index_max` (=%d) should not exceed `num_of_wf_lm` (=%d)\n", rank, lm_index_max, num_of_wf_lm);
+    fprintf(stderr, "[ERROR][@rank=%d] `lm_index_max` (=%d) should not exceed `num_of_wf_lm` (=%ld)\n", rank, lm_index_max, num_of_wf_lm);
     return EXIT_FAILURE;
   } else {
     fprintf(stdout, "[ LOG ][@rank=%d] lm_index_start: %d / num_of_wf_to_read: %d\n", rank, lm_index_start, num_of_wf_to_read);

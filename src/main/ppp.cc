@@ -627,14 +627,31 @@ int main(int argc, char *argv[]) {
 
   //// Write wf data to a file
 #ifdef HAVE_MPI
+  
+
+
+  // Define MPI user-defined type for describing the wavefunction file
+//  MPI_Datatype vec_type_wf_file;
+//  MPI_Type_vector(num_of_wf_to_read, N_rho, num_of_process * N_rho, element_type, &vec_type_wf_file);
+//  MPI_Type_commit(&vec_type_wf_file);
+  
+
+
 
   // Open file
   return_code = MPI_File_open(working_world, current_wf_bin_file_name.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
 //  return_code = MPI_File_open(MPI_COMM_WORLD, current_wf_bin_file_name.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_open"); }
+  
+  // Apply the defined MPI Datatype to the wavefunction file
+  return_code = MPI_File_set_view(fh, offset_lm, element_type, vec_type_wf_file, "native", MPI_INFO_NULL);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_set_view"); }
+
   // Write
   MPI_Status write_status_wf;
-  return_code = MPI_File_write_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, element_type, &write_status_wf);
+  // [NOTE] The offset for `MPI_File_write_at()` is zero due to the file view
+  return_code = MPI_File_write_at(fh, 0, wf_read, num_of_wf_to_read * N_rho, element_type, &write_status_wf);
+//  return_code = MPI_File_write_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, element_type, &write_status_wf);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write_at"); }
 
   int num_of_elements_written = -1;

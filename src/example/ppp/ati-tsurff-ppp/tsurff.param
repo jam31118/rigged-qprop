@@ -18,6 +18,5 @@ cache-size-t long 512
 # expansion-scheme=1: use for small number of angles and large number of ells (no partial spectra are produced)
 expansion-scheme long 2
 
-
-## PPP parameters
+# Paralleled Post Propagation configuration
 use-ppp bool 1

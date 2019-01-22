@@ -308,12 +308,18 @@ int main(int argc, char *argv[]) {
   return_code = MPI_File_set_view(fh, offset_lm, element_type, vec_type_wf_file, "native", MPI_INFO_NULL);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_set_view"); }
 
-  // [NOTE] The offset for `MPI_File_read_at()` is zero due to the file view
+  // [NOTE] The offset for `MPI_File_iread_at_all;()` is zero due to the file view
+  MPI_Request read_request;
+  return_code = MPI_File_iread_at_all(fh, 0, wf_read, num_of_elements_in_wf_stack, element_type, &read_request);
+//  return_code = MPI_File_read_at_all(fh, 0, wf_read, num_of_elements_in_wf_stack, element_type, &read_status);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_iread_at_all"); }
+
+  // Wait till the file reading operation is done
   MPI_Status read_status;
-  return_code = MPI_File_read(fh, wf_read, num_of_elements_in_wf_stack, element_type, &read_status);
-  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_read"); }
+  return_code = MPI_Wait(&read_request, &read_status);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_Wait"); }
   
-  // Get the number of elements that has been read from `MPI_File_read()`
+  // Get the number of elements that has been read from `MPI_File_iread_at_all()`
   int num_of_elements_read = -1;
   return_code = MPI_Get_count(&read_status, element_type, &num_of_elements_read);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_Get_count"); }
@@ -321,20 +327,18 @@ int main(int argc, char *argv[]) {
   // Cehck whether all target elements has been successfully read from the target file
   if (num_of_elements_read != num_of_elements_in_wf_stack) {
     fprintf(stderr, "[ERROR][@rank=%d] Number of elements to be read (=%d) is different from the actual number of elements that has been read (=%d) from file `%s`\n", rank, num_of_elements_in_wf_stack, num_of_elements_read, current_wf_bin_file_name.c_str());
-    return error_and_exit(rank, EXIT_FAILURE, "MPI_File_read");
+    return error_and_exit(rank, EXIT_FAILURE, "MPI_File_iread_at_all");
   }
 
-
-//  MPI_Status read_status;
-//  return_code = MPI_File_read_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, MPI::DOUBLE_COMPLEX, &read_status);
-//  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_read_at"); }
 #else
+
   fh.read((char *) wf_read, num_of_elements_in_wf_stack * sizeof(std::complex<double>));
   if (!fh) { 
     fprintf(stderr, "[ERROR] only `%ld` elements could be read\n", fh.gcount());
     fh.close();
     return EXIT_FAILURE;
   }
+
 #endif
 
 
@@ -577,30 +581,61 @@ int main(int argc, char *argv[]) {
   disp = rank * element_type_size;
 
   // Declare variables for MPI writing process
-  MPI_Status write_status;
+  MPI_Request write_request_tsurff;
+  MPI_Status write_status_tsurff;
   MPI_File tsurff_psi_raw_file, tsurff_dpsidr_raw_file;
+
+
+  std::complex<double> *tsurff_data_arr_list[2] = { psi_R_arr, dpsi_drho_R_arr };
+  MPI_File tsurff_raw_file_list[2], tsurff_raw_file;
+  string tsurff_raw_file_name_list[2] = { "tsurffpsi.raw", "tsurff-dpsidr.raw" };
+
   // Write tsurff quantities to file after setting view
   // - in this case, it corresponds to imposing a kind of mask to a file 
   //   so that a contiguous array of tsurff quantities can be stored at once 
   //   without looping over each time step
   // This is for `tsurffpsi.raw`
-  MPI_File_open(working_world, "tsurffpsi.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_psi_raw_file);
+
+  int num_of_elements_written = -1;
+  
+  for (i=0; i<2; ++i) {
+    tsurff_raw_file = tsurff_raw_file_list[i];
+
+    MPI_File_open(working_world, tsurff_raw_file_name_list[i].c_str(), MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_raw_file);
 //  MPI_File_open(MPI_COMM_WORLD, "tsurffpsi.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_psi_raw_file);
-  MPI_File_get_position(tsurff_psi_raw_file, &end_position);
-  MPI_File_set_view(tsurff_psi_raw_file, end_position+disp, element_type, block_type, "native", MPI_INFO_NULL);
-  return_code = MPI_File_write(tsurff_psi_raw_file, psi_R_arr, tsurff_buffer_length, element_type, &write_status);
-  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write"); }
-  return_code = MPI_File_close(&tsurff_psi_raw_file);
-  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_close"); }
-  // This is for `tsurff-dpsidr.raw`
-  MPI_File_open(working_world, "tsurff-dpsidr.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_dpsidr_raw_file);
-//  MPI_File_open(MPI_COMM_WORLD, "tsurff-dpsidr.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_dpsidr_raw_file);
-  MPI_File_get_position(tsurff_dpsidr_raw_file, &end_position);
-  MPI_File_set_view(tsurff_dpsidr_raw_file, end_position+disp, element_type, block_type, "native", MPI_INFO_NULL);
-  return_code = MPI_File_write(tsurff_dpsidr_raw_file, dpsi_drho_R_arr, tsurff_buffer_length, element_type, &write_status);
-  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write"); }
-  return_code = MPI_File_close(&tsurff_dpsidr_raw_file);
-  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_close"); }
+    MPI_File_get_position(tsurff_raw_file, &end_position);
+    MPI_File_set_view(tsurff_raw_file, end_position+disp, element_type, block_type, "native", MPI_INFO_NULL);
+    return_code = MPI_File_iwrite_at_all(tsurff_raw_file, 0, tsurff_data_arr_list[i], tsurff_buffer_length, element_type, &write_request_tsurff);
+//  return_code = MPI_File_write(tsurff_psi_raw_file, psi_R_arr, tsurff_buffer_length, element_type, &write_status);
+    if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write"); }
+  
+    return_code = MPI_Wait(&write_request_tsurff, &write_status_tsurff);
+    if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_Wait"); }
+  
+    // Get the number of elements that has been written by `MPI_File_iwrite_at_all()`
+    return_code = MPI_Get_count(&write_status_tsurff, element_type, &num_of_elements_written);
+    if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_Get_count"); }
+
+    if (num_of_elements_written != tsurff_buffer_length) {
+      fprintf(stderr, "[ERROR][@rank=%d] Inconsistent writing file `%s`\n", rank, tsurff_raw_file_name_list[i].c_str());
+      return error_and_exit(rank, EXIT_FAILURE, "MPI_File_iwrite_at_all");
+    }
+
+    return_code = MPI_File_close(&tsurff_raw_file);
+    if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_close"); }
+
+  }
+
+
+//  // This is for `tsurff-dpsidr.raw`
+//  MPI_File_open(working_world, "tsurff-dpsidr.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_dpsidr_raw_file);
+////  MPI_File_open(MPI_COMM_WORLD, "tsurff-dpsidr.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_dpsidr_raw_file);
+//  MPI_File_get_position(tsurff_dpsidr_raw_file, &end_position);
+//  MPI_File_set_view(tsurff_dpsidr_raw_file, end_position+disp, element_type, block_type, "native", MPI_INFO_NULL);
+//  return_code = MPI_File_write(tsurff_dpsidr_raw_file, dpsi_drho_R_arr, tsurff_buffer_length, element_type, &write_status);
+//  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write"); }
+//  return_code = MPI_File_close(&tsurff_dpsidr_raw_file);
+//  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_close"); }
 
 
 #else // without MPI
@@ -649,18 +684,25 @@ int main(int argc, char *argv[]) {
 
   // Write
   MPI_Status write_status_wf;
+  MPI_Request write_request;
   // [NOTE] The offset for `MPI_File_write_at()` is zero due to the file view
-  return_code = MPI_File_write_at(fh, 0, wf_read, num_of_wf_to_read * N_rho, element_type, &write_status_wf);
+  return_code = MPI_File_iwrite_at_all(fh, 0, wf_read, num_of_wf_to_read * N_rho, element_type, &write_request);
+//  return_code = MPI_File_write_at(fh, 0, wf_read, num_of_wf_to_read * N_rho, element_type, &write_status_wf);
 //  return_code = MPI_File_write_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, element_type, &write_status_wf);
-  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write_at"); }
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_iwrite_at_all"); }
 
-  int num_of_elements_written = -1;
+  // Wait unitl the writing operation is done
+  return_code = MPI_Wait(&write_request, &write_status_wf);
+  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_Wait"); }
+  
+  // Get the number of elements that has been read from `MPI_File_iwrite_at_all()`
+//  int num_of_elements_written = -1;
   return_code = MPI_Get_count(&write_status_wf, element_type, &num_of_elements_written);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_Get_count"); }
 
   if (num_of_elements_written != num_of_wf_to_read * N_rho) {
     fprintf(stderr, "[ERROR][@rank=%d] Inconsistent writing file `%s`\n", rank, current_wf_bin_file_name.c_str());
-    return error_and_exit(rank, EXIT_FAILURE, "MPI_File_Write_at");
+    return error_and_exit(rank, EXIT_FAILURE, "MPI_File_iwrite_at_all");
   }
 
   // [NOTE] Check `write_status` to confirm how many elements has been written

@@ -4,6 +4,7 @@
 #SBATCH --job-name=ppp-mpi
 
 #SBATCH --output=slurm.%x.%j.log
+#SBATCH --error=slurm.%x.%j.err
 
 #SBATCH --ntasks=12
 #SBATCH --nodes=1

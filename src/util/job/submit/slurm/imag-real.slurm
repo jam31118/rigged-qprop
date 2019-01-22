@@ -3,6 +3,7 @@
 #SBATCH --job-name=imag-real
 
 #SBATCH --output=slurm.%x.%j.log
+#SBATCH --error=slurm.%x.%j.err
 
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1

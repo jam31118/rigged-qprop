@@ -27,16 +27,9 @@
 
 //// header for time-measurement
 #include <chrono>
-//#ifdef HAVE_BOOST
-//#include <boost/timer.hpp>
-//#endif
-
-//// For time measurement
-//typedef std::chrono::high_resolution_clock Clock;
 
 // Define macro function
 #define MIN(x,y) ((x<y)?x:y)
-//#define DUMMY_INT -1<<31
 
 
 int error_and_exit(int rank, int return_code, const char *func_name) {
@@ -69,6 +62,7 @@ int main(int argc, char *argv[]) {
   //// Declare variables with optional initialization
   int return_code = EXIT_FAILURE;
   int num_of_process = 1, rank = 0;  // default is a single-process mode
+
   
 #ifdef HAVE_MPI 
   //// MPI Initialization
@@ -142,11 +136,13 @@ int main(int argc, char *argv[]) {
   long l, m, N_rho;
   int lm_index; // iteration for lm_unifired index
   double Z, delta_rho, delta_t, grid_size;
+
   // declare pointers for l-indenpendent, double arrays
   double 
     *rho_array = NULL, 
     *scalarpot_array = NULL, 
     *imagpot_array = NULL;
+
   // declare pointers for l-dependent, complex double arrays
   std::complex<double> 
     *diag_unitary = NULL, 
@@ -156,6 +152,8 @@ int main(int argc, char *argv[]) {
     *lower_offdiag_unitary_inv = NULL, 
     *upper_offdiag_unitary_inv = NULL;
   
+
+
   //// Extract calculation parameters
   delta_rho = para_ini.getDouble("delta-r");
   grid_size = get_grid_size(para_ini, para_prop, para_tsurff);
@@ -163,6 +161,8 @@ int main(int argc, char *argv[]) {
   Z = para_ini.getDouble("nuclear-charge");
   delta_t = para_prop.getDouble("delta-t");
   
+
+
   //// Set grid parameters
   g_prop.set_dim(para_ini.getLong("qprop-dim"));
   g_prop.set_ngps(N_rho, para_prop.getLong("ell-grid-size"), 1);
@@ -171,44 +171,46 @@ int main(int argc, char *argv[]) {
 
 
 
-  // Determine the number of basis wf (i.e. `wf_lm`) in the wf file
+  //// Determine the number of basis wf (i.e. `wf_lm`) in the wf file
   long num_of_wf_lm = g_prop.num_of_phi_lm();
   if (num_of_wf_lm < 0) { std::cerr << "[ERROR] during `g_prop.num_of_phi_lm()`\n"; return EXIT_FAILURE; }
-  if (rank == 0) {
-    fprintf(stdout, "[ LOG ][@rank=%d] num_of_wf_lm = %ld\n", rank, num_of_wf_lm);
-  }
-//  std::cout << "[ LOG ] num_of_wf_lm = " << num_of_wf_lm << std::endl;
+  if (rank == 0) { fprintf(stdout, "[ LOG ][@rank=%d] num_of_wf_lm = %ld\n", rank, num_of_wf_lm); }
   const int num_of_remaining_wf = num_of_wf_lm % num_of_process;
 
 
+
 #ifdef HAVE_MPI
+
   //// Drop process that may be unused
-  MPI_Group world_group;
+  
+  // Construct `world_group` representing the total set of processes
+  MPI_Group world_group = MPI_GROUP_EMPTY;
   MPI_Comm_group(MPI_COMM_WORLD, &world_group);
-  MPI_Group working_group; // = MPI_GROUP_EMPTY;
+
+  // Construct `working_group` representing a subset of processes which will actually run
+  // .. In case where the number of process is larger than the num_of_wf_lm,
+  // .. processes with last few ranks is dropped out and finalize before entering the calculation part
+  MPI_Group working_group  = MPI_GROUP_EMPTY;
   int working_rank_range_incl[1][3] = { { 0, num_of_process-1, 1 } };
-//  int working_rank_range_excl[1][3] = { { 0, num_of_process-1, 1 } };
-  if ( num_of_wf_lm < num_of_process ) {
-//    working_rank_range_excl[0][0] = num_of_remaining_wf;
-    working_rank_range_incl[0][1] = num_of_remaining_wf-1;
-//    MPI_Group_range_excl(working_group, 1, working_rank_range_excl, &working_group);
-  }
+  if ( num_of_wf_lm < num_of_process ) { working_rank_range_incl[0][1] = num_of_remaining_wf-1; }
   MPI_Group_range_incl(world_group, 1, working_rank_range_incl, &working_group);
 
+  // Construct MPI world `working_world` which consists of a group, the `working_group`
+  // .. from now on, the `working_world` should be used instead of `MPI_COMM_WORLD`
   MPI_Comm working_world;
   MPI_Comm_create(MPI_COMM_WORLD, working_group, &working_world);
 
-  if (working_world == MPI_COMM_NULL) {
-    fprintf(stdout, "[ LOG ][@rank=%d] I'm going to finalize MPI\n", rank);
-    MPI_Finalize();
-    return EXIT_SUCCESS;
-  }
+  // Finalize and exit the program if myself, represented by my `rank` does not need to run
+  // .. most probably due to the lack of the number of radials wavefunctions to be calculated.
+  if (working_world == MPI_COMM_NULL) { return finalize_mpi_with_check(rank); }
+
 #endif // HAVE_MPI
 
 
 
 
   //// Configure wf file 
+  
   // open file
   string current_wf_bin_file_name = string("current-wf.bin");
 #ifdef HAVE_MPI
@@ -220,7 +222,6 @@ int main(int argc, char *argv[]) {
   fh.open(current_wf_bin_file_name, std::ios::in | std::ios::binary);
   if (!fh.is_open()) { fprintf(stderr,"[ERROR] during opening file `%s`\n", current_wf_bin_file_name.c_str()); }
 #endif
-
 
   // Get file size
 #ifdef HAVE_MPI
@@ -236,7 +237,6 @@ int main(int argc, char *argv[]) {
 #endif
   long current_wf_file_size = file_size;
 
-
   // Determine the `bytes_per_wf` to read
   long bytes_per_wf = current_wf_file_size / num_of_wf_lm;
   if (rank == 0) {
@@ -251,62 +251,30 @@ int main(int argc, char *argv[]) {
   }
 
 
-  //// Set parameter
-//  int lm_index_start, lm_index_max;
-//  int num_of_wf_to_read;
+
+
+  //// Determine the number of wf_lm to read and process: `num_of-wf_to_read` and the range of their `lm_index`s
   const int num_of_wf_per_proc_max = ( num_of_wf_lm + (num_of_process - 1) ) / num_of_process;
   const int num_of_wf_per_proc_min = num_of_wf_lm / num_of_process;
-//  if ( num_of_wf_lm >= num_of_process ) {
-//    num_of_wf_to_read = num_of_wf_per_proc;
-//    if (rank == num_of_process - 1) {
-//      num_of_wf_to_read = num_of_wf_lm - (num_of_process - 1) * num_of_wf_per_proc;
-//    } 
-//  } else {
-//      if (rank < num_of_wf_lm) { num_of_wf_to_read = 1; }
-//      else { num_of_wf_to_read = 0; }
-//  }
-
   const int num_of_wf_to_read = num_of_wf_per_proc_min + (rank < num_of_remaining_wf);
-//  const int num_of_wf_before_this_rank = ( (num_of_wf_lm / num_of_process) + (num_of_remaining_wf != 0) ) * rank - (rank - num_of_remaining_wf) * (rank >= num_of_remaining_wf);
-
-//  lm_index_start = rank * num_of_wf_per_proc;
-//  lm_index_start = num_of_wf_before_this_rank;
-  int lm_index_start = rank;
-//  if (rank >= num_of_remaining_wf) { lm_index_start = DUMMY_INT; }
-//  const int lm_index_max = lm_index_start + num_of_wf_to_read;
-  int lm_index_max = lm_index_start + num_of_wf_to_read * num_of_process;
-//  if (rank >= num_of_remaining_wf) { lm_index_max = DUMMY_INT; }
+  const int lm_index_start = rank;
+  const int lm_index_max = lm_index_start + num_of_wf_to_read * num_of_process;
 
   if ( (num_of_wf_lm < num_of_process) && (rank >= num_of_remaining_wf) ) {
     if ( (num_of_wf_to_read != 0) || (lm_index_max != lm_index_start) ) {
       fprintf(stderr, "[ERROR][@rank=%d] There is an inconsistency\n", rank);
       return EXIT_FAILURE;
     }
-//    fprintf(stdout, "[ LOG ][@rank=%d] going to finalize MPI\n", rank);
-//    MPI_Finalize();
-//    return EXIT_SUCCESS;
   }
-//  if ( (num_of_wf_lm < num_of_process) && (rank >= num_of_remaining_wf) ) {
-//    fprintf(stdout, "[ LOG ][@rank=%d] going to finalize MPI\n", rank);
-//    MPI_Finalize();
-//    fprintf(stdout, "[ LOG ][@rank=%d] finalized MPI\n", rank);
-//    return EXIT_SUCCESS;
-////    return finalize_mpi_with_check(rank);
-//  }
-//  if (lm_index_max > num_of_wf_lm) {
 
   if ( lm_index_max >= num_of_wf_lm * (num_of_process + 1) ) {
-//    std::cerr << "[ERROR] `lm_index_max` should not exceed `num_of_wf_lm`\n";
     fprintf(stderr, "[ERROR][@rank=%d] `lm_index_max` (=%d) should not exceed `num_of_wf_lm` (=%ld)\n", rank, lm_index_max, num_of_wf_lm);
     return EXIT_FAILURE;
   } else {
     fprintf(stdout, "[ LOG ][@rank=%d] lm_index_start: %d / num_of_wf_to_read: %d\n", rank, lm_index_start, num_of_wf_to_read);
   }
 
-  //// specify wf region to read
-  long offset_lm;
-  offset_lm = lm_index_start * bytes_per_wf;
-  std::cout << "[@rank=" << rank << "]" << "[ LOG ] offset_lm = " << offset_lm << std::endl;
+
 
 
   //// Allocate memory for wavefunciton
@@ -318,47 +286,39 @@ int main(int argc, char *argv[]) {
   wf_read_aug[0] = 0; wf_read_aug[num_of_elements_in_wf_stack + 1] = 0;  // set each ends as zeros
   wf_read = wf_read_aug + 1;
 #else
-//  if (num_of_wf_to_read != 0) {
   wf_read = new std::complex<double>[num_of_elements_in_wf_stack];
-//  }
 #endif
+
+
+
 
   //// Read wf data from file
 #ifdef HAVE_MPI
 
+  // specify wf region to read
+  long offset_lm;
+  offset_lm = lm_index_start * bytes_per_wf;
+  std::cout << "[@rank=" << rank << "]" << "[ LOG ] offset_lm = " << offset_lm << std::endl;
+
+  // Define MPI user-defined type for describing the wavefunction file
   MPI_Datatype vec_type_wf_file;
   MPI_Type_vector(num_of_wf_to_read, N_rho, num_of_process, element_type, &vec_type_wf_file);
   MPI_Type_commit(&vec_type_wf_file);
-  // Determine displacement (`disp`) for this process
-//  MPI_Offset disp;
-//MPI_Offset end_position;
-//  disp = rank * num_of_wf_per_proc * element_type_size;
-//  disp = num_of_wf_before_this_rank * element_type_size;
-  // Declare variables for MPI writing process
-  // Write tsurff quantities to file after setting view
-  // - in this case, it corresponds to imposing a kind of mask to a file 
-  //   so that a contiguous array of tsurff quantities can be stored at once 
-  //   without looping over each time step
-  // This is for `tsurffpsi.raw`
-//  MPI_File_open(MPI_COMM_WORLD, "tsurffpsi.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_psi_raw_file);
-//  MPI_File_get_position(fh, &end_position);
-  fprintf(stdout, "[ LOG ][@rank=%d] before MPI_File_set_view\n", rank);
+  
+  // Apply the defined MPI Datatype to the wavefunction file
   return_code = MPI_File_set_view(fh, offset_lm, element_type, vec_type_wf_file, "native", MPI_INFO_NULL);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_set_view"); }
 
-  // The offset for `MPI_File_read_at()` is zero due to the file view
-  fprintf(stdout, "[ LOG ][@rank=%d] before MPI_File_read\n", rank);
+  // [NOTE] The offset for `MPI_File_read_at()` is zero due to the file view
   MPI_Status read_status;
   return_code = MPI_File_read(fh, wf_read, num_of_elements_in_wf_stack, element_type, &read_status);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_read"); }
 
-  fprintf(stdout, "[ LOG ][@rank=%d] after MPI_File_read\n", rank);
 
 //  MPI_Status read_status;
 //  return_code = MPI_File_read_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, MPI::DOUBLE_COMPLEX, &read_status);
 //  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_read_at"); }
 #else
-//  fh.read((char *) wf_read, N_rho * num_of_wf_to_read * sizeof(std::complex<double>));
   fh.read((char *) wf_read, num_of_elements_in_wf_stack * sizeof(std::complex<double>));
   if (!fh) { 
     fprintf(stderr, "[ERROR] only `%ld` elements could be read\n", fh.gcount());
@@ -379,6 +339,7 @@ int main(int argc, char *argv[]) {
 
 
   //// Instatiating potential objects
+  
   // Prepare scalarpot
   scalarpot atomic_potential(
       para_ini.getDouble("nuclear-charge"), 
@@ -389,8 +350,9 @@ int main(int argc, char *argv[]) {
   imagpot imaginarypot(imag_potential_width);
 
 
+
   //// Prepare l-indenepent arrays
-  //
+  
   // declare pointers for l-indenpendent, double arrays && allocation
   rho_array = new double[N_rho];
   scalarpot_array = new double[N_rho];
@@ -407,21 +369,16 @@ int main(int argc, char *argv[]) {
 
 
 
-  fprintf(stdout, "[ LOG ][@rank=%d] before evaluating tridiags\n", rank);
   
   //// Allocate memory for storing propagators for each `l` values
   std::complex<double> *tridiags_unitary_stack[NUM_OF_ARRAY_IN_TRIDIAGS], *tridiags_unitary_inv_stack[NUM_OF_ARRAY_IN_TRIDIAGS];
   for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) {
-
-//    if (num_of_wf_to_read == 0) { break; }
-
     tridiags_unitary_stack[i] = new std::complex<double>[N_rho * num_of_wf_to_read];
     if (tridiags_unitary_stack[i] == NULL) { return error_and_exit(rank, EXIT_FAILURE, "malloc"); }
     tridiags_unitary_inv_stack[i] = new std::complex<double>[N_rho * num_of_wf_to_read];
     if (tridiags_unitary_inv_stack[i] == NULL) { return error_and_exit(rank, EXIT_FAILURE, "malloc"); }
   }
 
-  fprintf(stdout, "[ LOG ][@rank=%d] right before evaluating tridiags\n", rank);
 
   //// Store propagators to each stacks
   // Prepare some variables
@@ -430,17 +387,12 @@ int main(int argc, char *argv[]) {
   // Start storing
   int lm_index_index;
   for (lm_index=lm_index_start, lm_index_index=0; lm_index<lm_index_max; lm_index += num_of_process, ++lm_index_index) {
-
-//    if (num_of_wf_to_read == 0) { break; }
-
-    fprintf(stdout, "[ LOG ][@rank=%d] at the head lm_index loop, lm_index: %d\n", rank, lm_index);
-
+    
     //// Retrieve `l` and `m` quantum numbers
     if (0 != get_ell_and_m_from_lm_index(lm_index, &l, &m, para_ini.getLong("initial-m"), g_prop.dimens())) { 
-      fprintf(stderr, "[ERROR] during `get_ell_and_m_from_lm_index`\n");
+      fprintf(stderr, "[ERROR][@rank=%d] during `get_ell_and_m_from_lm_index`\n", rank);
       return EXIT_FAILURE; 
     }
-
     
     //// Evaulate unitary propagator
     lm_index_offset = lm_index - lm_index_start;
@@ -448,7 +400,6 @@ int main(int argc, char *argv[]) {
     // sign = -1 for explicit half time propagation
     for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) { 
       tridiags_unitary[i] = tridiags_unitary_stack[i] + lm_index_index * N_rho; 
-//      tridiags_unitary[i] = tridiags_unitary_stack[i] + lm_index_offset * N_rho; 
     }
     sign = -1;
     evaluate_Numerov_boosted_CN_propagator_tridiags_for_sph_harm_basis_simple(
@@ -457,14 +408,11 @@ int main(int argc, char *argv[]) {
     // sign = 1 for implicit half time propagation
     for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) { 
       tridiags_unitary_inv[i] = tridiags_unitary_inv_stack[i] + lm_index_index * N_rho; 
-//      tridiags_unitary_inv[i] = tridiags_unitary_inv_stack[i] + lm_index_offset * N_rho; 
     }
     sign = 1;
     evaluate_Numerov_boosted_CN_propagator_tridiags_for_sph_harm_basis_simple(
         l,sign,N_rho,Z,delta_rho,delta_t,rho_array,scalarpot_array,imagpot_array,tridiags_unitary_inv);
     
-    fprintf(stdout, "[ LOG ][@rank=%d] at the tail lm_index loop, lm_index: %d\n", rank, lm_index);
-
   } 
 
 
@@ -481,8 +429,8 @@ int main(int argc, char *argv[]) {
   catch (std::exception&) { 
     try { p_min_tsurff = para_tsurff.getDouble("p-min-tsurff"); }
     catch (std::exception&) {
-      std::cerr << "[ERROR] either `num-of-time-steps` or `p-min-tsurff` should be set\n";
-      return -1;
+      fprintf(stderr, "[ERROR][@rank=%d] either `num-of-time-steps` or `p-min-tsurff` should be set\n", rank);
+      return EXIT_FAILURE;
     }
     post_prop_duration = para_tsurff.getDouble("R-tsurff") / p_min_tsurff;
     num_of_time_steps = long(post_prop_duration / delta_t); 
@@ -491,35 +439,33 @@ int main(int argc, char *argv[]) {
   long time_index;
   long num_of_steps_to_print_progress = 200; // [NOTE] to become global default config
   if (rank==0) {
-    std::cout << "[@rank=" << rank << "]" << "[ LOG ] num_of_time_steps: " << num_of_time_steps << std::endl;
-    std::cout << "[@rank=" << rank << "]" << "[ LOG ] post_prop_duration: " << post_prop_duration << std::endl;
+    fprintf(stdout, "[ LOG ][@rank=%d] num_of_time_steps: %ld", rank, num_of_time_steps);
+    fprintf(stdout, "[ LOG ][@rank=%d] post_prop_duration: %f", rank, post_prop_duration);
   }
+
+
 
   //// Prepare memory for storing tsurff-quantity
   long tsurff_buffer_length = num_of_wf_to_read * num_of_time_steps;
   std::complex<double> *psi_R_arr = NULL;
   std::complex<double> *dpsi_drho_R_arr = NULL;
-//  if (num_of_wf_to_read != 0) {
   psi_R_arr = new std::complex<double>[tsurff_buffer_length];
   dpsi_drho_R_arr = new std::complex<double>[tsurff_buffer_length];
-//  }
   long index_at_R = g_prop.rindex(para_tsurff.getDouble("R-tsurff"));
 
 
 
-
+  //// Prepare timer
   std::chrono::_V2::system_clock::time_point prop_start_time, prop_end_time;
   std::chrono::duration<double> elapsed_time_prop_total;
-//  int elapsed_time_prop_total = -1;
-//#ifdef HAVE_BOOST
-//  boost::timer tim;
-//#endif
 
 
 
   //// Propagate with tsurff quantity evaluation
   int return_code_prop = EXIT_FAILURE;
+
 #ifdef HAVE_CUDA
+
   // forward tridiagonal multiplication configuration
   int num_of_thread_per_block = 128;
   int num_of_blocks_max = 32;
@@ -532,12 +478,8 @@ int main(int argc, char *argv[]) {
   int batch_stride = N_rho;
 
 
-//#ifdef HAVE_BOOST
-//    tim.restart();
-//#endif 
   prop_start_time = std::chrono::high_resolution_clock::now();
 
-  // running with gpu
   return_code_prop = cu_crank_nicolson_with_tsurff (
     index_at_R, delta_rho, start_time_index, num_of_time_steps,
     wf_read_aug, num_of_wf_to_read,
@@ -547,42 +489,28 @@ int main(int argc, char *argv[]) {
     block_dim3_in, grid_dim3_in, batch_stride);
 
 
-//#ifdef HAVE_BOOST
-//  elapsed_time_prop_total = tim.elapsed();
-//#endif // HAVE_BOOST
   prop_end_time = std::chrono::high_resolution_clock::now();
 
-//  return_code_prop = tridiag_forward_backward (
-//    N_rho, tridiags_unitary_stack, tridiags_unitary_inv_stack, wf_read_aug, 
-//    start_time_index, time_index_max,
-//    block_dim3_in, grid_dim3_in, 
-//    num_of_wf_to_read, N_rho);
   if (return_code_prop != EXIT_SUCCESS) { 
-    fprintf(stderr, "[ERROR] Abnormal exit from `cu_crank_nicolson_with_tsurff()`\n"); 
-    return return_code_prop; 
+    fprintf(stderr, "[ERROR] Abnormal exit from `cu_crank_nicolson_with_tsurff()` with code: `%d`\n", return_code_prop);
+    return EXIT_FAILURE;
   }
-#else
 
-//#ifdef HAVE_BOOST
-//    tim.restart();
-//#endif 
+#else // without CUDA
+
   prop_start_time = std::chrono::high_resolution_clock::now();
 
-//  if (num_of_wf_to_read != 0) {
   //// running for non-gpu case
   return_code_prop = crank_nicolson_with_tsurff (
       index_at_R, delta_rho, start_time_index, num_of_time_steps, 
       wf_read, num_of_wf_to_read, psi_R_arr, dpsi_drho_R_arr, N_rho, 
       tridiags_unitary_stack, tridiags_unitary_inv_stack, 
       num_of_steps_to_print_progress, rank );
-//  }
 
-//#ifdef HAVE_BOOST
-//  elapsed_time_prop_total = tim.elapsed();
-//#endif // HAVE_BOOST
   prop_end_time = std::chrono::high_resolution_clock::now();
 
   if (return_code_prop != EXIT_SUCCESS) { return error_and_exit(rank, return_code_prop, "crank_nicolson_with_tsurff"); }
+
 #endif // HAVE_CUDA
 
 
@@ -591,10 +519,7 @@ int main(int argc, char *argv[]) {
 
   elapsed_time_prop_total =  prop_end_time - prop_start_time;
   fprintf(stdout, "[ LOG ][@rank=%d] Elapsed time for propagation: `%f` seconds\n", rank, elapsed_time_prop_total.count());
-//#ifdef HAVE_BOOST
-//  cout << "time step took " << elapsed_time_prop_total.count() << " seconds" << endl;
-//  cout << "time step took " << tim.elapsed() << " seconds" << endl;
-//#endif
+
 
 
   //// Free arrays right after the propagation
@@ -611,9 +536,8 @@ int main(int argc, char *argv[]) {
 
   //// Write tsurff-quantities to files 
   string tsurff_psi_raw_file_name("tsurffpsi.raw"), tsurff_dpsidr_raw_file_name("tsurff-dpsidr.raw");
-#ifdef HAVE_MPI
 
-//  if (num_of_wf_to_read != 0) {
+#ifdef HAVE_MPI
 
   // [DEPRECIATED] Define a MPI data type
   // : an array of blocks corresponding to each process, 
@@ -635,14 +559,9 @@ int main(int argc, char *argv[]) {
   MPI_Type_contiguous(num_of_time_steps, vec_type_per_time_step, &block_type);
 //  MPI_Type_vector(num_of_time_steps, num_of_wf_to_read, num_of_wf_lm, element_type, &block_type);
   MPI_Type_commit(&block_type);
-  // Get `element_type`s size
-//  int element_type_size;
-//  MPI_Type_size(element_type, &element_type_size);
   // Determine displacement (`disp`) for this process
   MPI_Offset disp;
   MPI_Offset end_position;
-//  disp = rank * num_of_wf_per_proc * element_type_size;
-//  disp = num_of_wf_before_this_rank * element_type_size;
   disp = rank * element_type_size;
 
   // Declare variables for MPI writing process
@@ -671,9 +590,8 @@ int main(int argc, char *argv[]) {
   return_code = MPI_File_close(&tsurff_dpsidr_raw_file);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_close"); }
 
-//  }
 
-#else
+#else // without MPI
 
   std::ofstream tsurff_psi_raw_file, tsurff_dpsidr_raw_file;
   // This is for `tsurffpsi.raw`
@@ -694,9 +612,9 @@ int main(int argc, char *argv[]) {
 #endif
 
 
+
   //// Write wf data to a file
 #ifdef HAVE_MPI
-//  if (num_of_wf_to_read != 0) {
 
   // Open file
   return_code = MPI_File_open(working_world, current_wf_bin_file_name.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
@@ -713,9 +631,8 @@ int main(int argc, char *argv[]) {
   return_code = MPI_File_close(&fh);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_close"); }
 
-//  }
+#else // wihtout MPI
 
-#else
   fh.open(current_wf_bin_file_name.c_str(), std::ios::out | std::ios::binary);
   if (!fh.is_open()) { fprintf(stderr,"[ERROR] during opening file `%s`\n", current_wf_bin_file_name.c_str()); }
   fh.write((char *) wf_read, N_rho * num_of_wf_to_read * sizeof(std::complex<double>));
@@ -729,7 +646,7 @@ int main(int argc, char *argv[]) {
 
 
 
-  //// Free arrays
+  //// Free memory allocated for arrays
 #ifdef HAVE_CUDA
   free(wf_read_aug);
 #else
@@ -740,25 +657,14 @@ int main(int argc, char *argv[]) {
 
 
 
-
-
   //// MPI Finalization
 #ifdef HAVE_MPI
-  
-//  MPI_Barrier(MPI_COMM_WORLD);
-
-  
-//fin:
   return finalize_mpi_with_check(rank);
-//  return_code = MPI_Finalize();
-//  if (return_code == MPI_SUCCESS) {
-//    fprintf(stdout, "[@rank=%d][ LOG ] MPI program has been finalized.\n", rank);
-//  } else {
-//    fprintf(stderr, "[ERROR] Something got wrong during finalization.\n");
-//    return EXIT_FAILURE;
-//  }
 #endif
+
+
 
   //// End this program
   return EXIT_SUCCESS;
+
 }

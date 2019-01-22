@@ -291,7 +291,6 @@ int main(int argc, char *argv[]) {
 
 
 
-
   //// Read wf data from file
 #ifdef HAVE_MPI
 
@@ -562,12 +561,14 @@ int main(int argc, char *argv[]) {
   
   // Define vector type for describing data strucutre for each time step
   MPI_Datatype vec_type_per_time_step;
+//  MPI_Type_vector(num_of_wf_per_proc_max, 1, num_of_process * 1, element_type, &vec_type_per_time_step);
   MPI_Type_vector(num_of_wf_to_read, 1, num_of_process * 1, element_type, &vec_type_per_time_step);
   MPI_Type_commit(&vec_type_per_time_step);
   
   
   MPI_Datatype block_type;
-  MPI_Type_contiguous(num_of_time_steps, vec_type_per_time_step, &block_type);
+  MPI_Type_create_hvector(num_of_time_steps, 1, num_of_wf_lm * element_type_size, vec_type_per_time_step, &block_type);
+//  MPI_Type_contiguous(num_of_time_steps, vec_type_per_time_step, &block_type);
 //  MPI_Type_vector(num_of_time_steps, num_of_wf_to_read, num_of_wf_lm, element_type, &block_type);
   MPI_Type_commit(&block_type);
   // Determine displacement (`disp`) for this process

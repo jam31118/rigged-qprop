@@ -311,7 +311,6 @@ int main(int argc, char *argv[]) {
   // [NOTE] The offset for `MPI_File_iread_at_all;()` is zero due to the file view
   MPI_Request read_request;
   return_code = MPI_File_iread_at_all(fh, 0, wf_read, num_of_elements_in_wf_stack, element_type, &read_request);
-//  return_code = MPI_File_read_at_all(fh, 0, wf_read, num_of_elements_in_wf_stack, element_type, &read_status);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_iread_at_all"); }
 
   // Wait till the file reading operation is done
@@ -326,7 +325,8 @@ int main(int argc, char *argv[]) {
   
   // Cehck whether all target elements has been successfully read from the target file
   if (num_of_elements_read != num_of_elements_in_wf_stack) {
-    fprintf(stderr, "[ERROR][@rank=%d] Number of elements to be read (=%d) is different from the actual number of elements that has been read (=%d) from file `%s`\n", rank, num_of_elements_in_wf_stack, num_of_elements_read, current_wf_bin_file_name.c_str());
+    fprintf(stderr, "[ERROR][@rank=%d] Number of elements to be read (=%d) is different from the actual number of elements that has been read (=%d) from file `%s`\n", 
+        rank, num_of_elements_in_wf_stack, num_of_elements_read, current_wf_bin_file_name.c_str());
     return error_and_exit(rank, EXIT_FAILURE, "MPI_File_iread_at_all");
   }
 
@@ -535,7 +535,6 @@ int main(int argc, char *argv[]) {
   fprintf(stdout, "[ LOG ][@rank=%d] Elapsed time for propagation: `%f` seconds\n", rank, elapsed_time_prop_total.count());
 
 
-
   //// Free arrays right after the propagation
   for (i=0; i<NUM_OF_ARRAY_IN_TRIDIAGS; ++i) {
     free(tridiags_unitary_stack[i]);
@@ -547,34 +546,20 @@ int main(int argc, char *argv[]) {
 
 
 
-
   //// Write tsurff-quantities to files 
   string tsurff_psi_raw_file_name("tsurffpsi.raw"), tsurff_dpsidr_raw_file_name("tsurff-dpsidr.raw");
 
 #ifdef HAVE_MPI
-
-  // [DEPRECIATED] Define a MPI data type
-  // : an array of blocks corresponding to each process, 
-  // : thus separated with a certain interval
-  // - The number of blocks is `num_of_time_steps`.
-  // - The blocks are separated by a interval consisting of several `element_type`s.
-  //   The length ot that interval is `num_of_wf_lm`.
-  // - Each block consists of several `element_type`s.
-  //   The number of the `element_type`s per block is `num_of_wf_to_read`
-  
   
   // Define vector type for describing data strucutre for each time step
   MPI_Datatype vec_type_per_time_step;
-//  MPI_Type_vector(num_of_wf_per_proc_max, 1, num_of_process * 1, element_type, &vec_type_per_time_step);
   MPI_Type_vector(num_of_wf_to_read, 1, num_of_process * 1, element_type, &vec_type_per_time_step);
   MPI_Type_commit(&vec_type_per_time_step);
   
-  
   MPI_Datatype block_type;
   MPI_Type_create_hvector(num_of_time_steps, 1, num_of_wf_lm * element_type_size, vec_type_per_time_step, &block_type);
-//  MPI_Type_contiguous(num_of_time_steps, vec_type_per_time_step, &block_type);
-//  MPI_Type_vector(num_of_time_steps, num_of_wf_to_read, num_of_wf_lm, element_type, &block_type);
   MPI_Type_commit(&block_type);
+
   // Determine displacement (`disp`) for this process
   MPI_Offset disp;
   MPI_Offset end_position;
@@ -583,18 +568,14 @@ int main(int argc, char *argv[]) {
   // Declare variables for MPI writing process
   MPI_Request write_request_tsurff;
   MPI_Status write_status_tsurff;
-  MPI_File tsurff_psi_raw_file, tsurff_dpsidr_raw_file;
-
-
   std::complex<double> *tsurff_data_arr_list[2] = { psi_R_arr, dpsi_drho_R_arr };
   MPI_File tsurff_raw_file_list[2], tsurff_raw_file;
-  string tsurff_raw_file_name_list[2] = { "tsurffpsi.raw", "tsurff-dpsidr.raw" };
+  string tsurff_raw_file_name_list[2] = { tsurff_psi_raw_file_name, tsurff_dpsidr_raw_file_name };
 
   // Write tsurff quantities to file after setting view
   // - in this case, it corresponds to imposing a kind of mask to a file 
   //   so that a contiguous array of tsurff quantities can be stored at once 
   //   without looping over each time step
-  // This is for `tsurffpsi.raw`
 
   int num_of_elements_written = -1;
   
@@ -602,11 +583,9 @@ int main(int argc, char *argv[]) {
     tsurff_raw_file = tsurff_raw_file_list[i];
 
     MPI_File_open(working_world, tsurff_raw_file_name_list[i].c_str(), MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_raw_file);
-//  MPI_File_open(MPI_COMM_WORLD, "tsurffpsi.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_psi_raw_file);
     MPI_File_get_position(tsurff_raw_file, &end_position);
     MPI_File_set_view(tsurff_raw_file, end_position+disp, element_type, block_type, "native", MPI_INFO_NULL);
     return_code = MPI_File_iwrite_at_all(tsurff_raw_file, 0, tsurff_data_arr_list[i], tsurff_buffer_length, element_type, &write_request_tsurff);
-//  return_code = MPI_File_write(tsurff_psi_raw_file, psi_R_arr, tsurff_buffer_length, element_type, &write_status);
     if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write"); }
   
     return_code = MPI_Wait(&write_request_tsurff, &write_status_tsurff);
@@ -625,18 +604,6 @@ int main(int argc, char *argv[]) {
     if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_close"); }
 
   }
-
-
-//  // This is for `tsurff-dpsidr.raw`
-//  MPI_File_open(working_world, "tsurff-dpsidr.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_dpsidr_raw_file);
-////  MPI_File_open(MPI_COMM_WORLD, "tsurff-dpsidr.raw", MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &tsurff_dpsidr_raw_file);
-//  MPI_File_get_position(tsurff_dpsidr_raw_file, &end_position);
-//  MPI_File_set_view(tsurff_dpsidr_raw_file, end_position+disp, element_type, block_type, "native", MPI_INFO_NULL);
-//  return_code = MPI_File_write(tsurff_dpsidr_raw_file, dpsi_drho_R_arr, tsurff_buffer_length, element_type, &write_status);
-//  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_write"); }
-//  return_code = MPI_File_close(&tsurff_dpsidr_raw_file);
-//  if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_close"); }
-
 
 #else // without MPI
 
@@ -663,19 +630,8 @@ int main(int argc, char *argv[]) {
   //// Write wf data to a file
 #ifdef HAVE_MPI
   
-
-
-  // Define MPI user-defined type for describing the wavefunction file
-//  MPI_Datatype vec_type_wf_file;
-//  MPI_Type_vector(num_of_wf_to_read, N_rho, num_of_process * N_rho, element_type, &vec_type_wf_file);
-//  MPI_Type_commit(&vec_type_wf_file);
-  
-
-
-
   // Open file
   return_code = MPI_File_open(working_world, current_wf_bin_file_name.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
-//  return_code = MPI_File_open(MPI_COMM_WORLD, current_wf_bin_file_name.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_open"); }
   
   // Apply the defined MPI Datatype to the wavefunction file
@@ -687,8 +643,6 @@ int main(int argc, char *argv[]) {
   MPI_Request write_request;
   // [NOTE] The offset for `MPI_File_write_at()` is zero due to the file view
   return_code = MPI_File_iwrite_at_all(fh, 0, wf_read, num_of_wf_to_read * N_rho, element_type, &write_request);
-//  return_code = MPI_File_write_at(fh, 0, wf_read, num_of_wf_to_read * N_rho, element_type, &write_status_wf);
-//  return_code = MPI_File_write_at(fh, offset_lm, wf_read, num_of_wf_to_read * N_rho, element_type, &write_status_wf);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_File_iwrite_at_all"); }
 
   // Wait unitl the writing operation is done
@@ -696,7 +650,6 @@ int main(int argc, char *argv[]) {
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_Wait"); }
   
   // Get the number of elements that has been read from `MPI_File_iwrite_at_all()`
-//  int num_of_elements_written = -1;
   return_code = MPI_Get_count(&write_status_wf, element_type, &num_of_elements_written);
   if (return_code != MPI_SUCCESS) { return error_and_exit(rank, return_code, "MPI_Get_count"); }
 
@@ -704,8 +657,6 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "[ERROR][@rank=%d] Inconsistent writing file `%s`\n", rank, current_wf_bin_file_name.c_str());
     return error_and_exit(rank, EXIT_FAILURE, "MPI_File_iwrite_at_all");
   }
-
-  // [NOTE] Check `write_status` to confirm how many elements has been written
 
   // Close file
   return_code = MPI_File_close(&fh);
@@ -722,6 +673,7 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
   fh.close();
+
 #endif
 
 

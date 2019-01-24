@@ -59,11 +59,11 @@ int get_ell_and_m_from_lm_index(long lm_index, long *p_ell, long *p_m, long init
     case 44:
       ell = long(sqrt(lm_index));
       m = lm_index - ell*(ell+1);
+      if ((m > ell)||(m<-ell)) { return 1; }
       break;
     default:
       return 1;
   } 
-  if ((m > ell)||(m<-ell)) { return 1; }
   *p_ell = ell;
   *p_m = m;
   return 0;

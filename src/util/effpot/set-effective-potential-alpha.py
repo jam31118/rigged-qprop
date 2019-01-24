@@ -3,19 +3,33 @@ from qprop.parameter import update_param_in_file
 
 from os.path import isfile
 from sys import argv, stderr
+from os import environ
 
-if len(argv) != 3:
-    print("[ERROR] Enter (1) imaginary propagation binary " 
-            + "/ (2) first ioniation potential in atomic unit", file=stderr)
-    exit(1)
-# imag_prop_bin = './hydrogen_im'
-imag_prop_bin = argv[1]
+arg_error_mesg = "[ERROR] Enter (1) the first ioniation potential in atomic unit / (2) (optional) imaginary propagation binary"
+arg_error = IOError(arg_error_mesg)
+
+Ip, imag_prop_bin = None, None
+if len(argv) < 2:
+    raise arg_error
+elif len(argv) == 2:
+    imag_prop_bin = "{}/bin/imag-prop".format(environ['QPROP_HOME'])
+elif len(argv) == 3:
+    imag_prop_bin = argv[2]
+else:
+    raise arg_error
+Ip = float(argv[1])
+
+print("Ip: `{}`".format(Ip))
+print("imag_prop_bin: `{}`".format(imag_prop_bin))
+
 assert isfile(imag_prop_bin)
-Ip = float(argv[2])
+
+for arg in [Ip, imag_prop_bin]: assert arg is not None
+
+#imag_prop_bin = argv[1]
+#Ip = float(argv[2])
 
 
-
-#exit(1)
 
 def get_energy(effpot_alpha, Ip, imag_prop_bin, energy_filepath='initial-energy.dat'):
     assert isfile(imag_prop_bin)
@@ -31,7 +45,7 @@ def get_energy(effpot_alpha, Ip, imag_prop_bin, energy_filepath='initial-energy.
     assert isfile(energy_filepath)
     energy = read_scalar_from_file(energy_filepath)
     diff = energy - Ip
-    print("effpot_alpha: {0} / diff: {1} / energy: {2}".format(effpot_alpha, diff, energy), flush=True)
+    print("effpot_alpha: {0:20.16f} / diff: {1:20.16f} / energy: {2:20.16f}".format(effpot_alpha, diff, energy), flush=True)
     return diff
 
 
@@ -53,12 +67,12 @@ def read_scalar_from_file(filepath):
 
 # Ip = -4.4576e-01
 initial_guess = 3.0
-print("Starting with initial guess {0:.4}".format(initial_guess), flush=True)
+print("Starting with initial guess {0:20.16f}".format(initial_guess), flush=True)
 
 fargs = (Ip, imag_prop_bin)
 from scipy.optimize import fsolve
-alpha_at_zero = fsolve(get_energy, initial_guess, args=fargs)
-print("alpha_at_zero: {0}".format(alpha_at_zero), flush=True)
+alpha_at_zero, = fsolve(get_energy, initial_guess, args=fargs)
+print("alpha_at_zero: {0:20.16f}".format(alpha_at_zero), flush=True)
 
 
 ## generate global values

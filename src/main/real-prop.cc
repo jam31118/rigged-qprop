@@ -1,5 +1,11 @@
 #include "real-prop.h"
 
+#ifdef BOHM
+#include "log.hh"
+#include "lm.hh"
+#include "velocity.hh"
+#endif // BOHM
+
 using std::endl;
 using std::cout;
 
@@ -299,10 +305,174 @@ int real_prop(int argc, char **argv) {
 #ifdef HAVE_BOOST
     tim.restart();
 #endif
+
+
+
+
+#ifdef BOHM
+  
+  //// Configuration
+  const int N_s = 4, N_rho = g_prop.ngps_x();
+  const int N_r_dim = 3, N_l = g_prop.ngps_y(), qprop_dim=g_prop.dimens();
+  int N_p_;
+  try { N_p_ = para_prop.getLong("num-of-particle"); }
+  catch (std::exception&) { return return_with_mesg("Please specify the 'num-of-particle'"); }
+  const int N_p = N_p_;
+  if (N_p <= 0) { return return_with_mesg("The number of particle should be positive"); }
+
+  // N_l + 1; // initialized with forbidden m value
+  const int initial_m = my_m_quantum_num; 
+  const double rho_max = 5.0;
+
+  const int N_t = num_time_index + 1;
+//  const double delta_t = 0.2;
+//  const double t_0 = 0.2;
+
+  int N_lm;
+  if ( eval_N_lm(qprop_dim, N_l, &N_lm) != EXIT_SUCCESS) 
+  { return return_with_mesg("Failed to evaluate 'N_lm'"); }
+  if ( N_lm != g_prop.num_of_phi_lm() ) 
+  { return return_with_mesg("Inconsistent N_lm"); }
+
+  int *l_arr = new int[N_lm];
+  int *m_arr = new int[N_lm];
+  if ( eval_l_m_arr(qprop_dim, N_l, l_arr, m_arr, initial_m) != EXIT_SUCCESS )
+  { return return_with_mesg("Failed to evaluate 'l_arr', 'm_arr'"); }
+  
+  
+  //// Define useful variables
+  int return_code = EXIT_FAILURE;
+
+
+  //// Allocate memory for data
+
+  // Some variable
+  const int r_p_arr_size = N_r_dim * N_p;
+
+  // `r_p_arr`
+  double **r_p_arr = new double*[N_r_dim];
+  double *r_p_arr_1d = new double[r_p_arr_size];
+  for (int i_r_dim = 0; i_r_dim < N_r_dim; i_r_dim++) {
+    r_p_arr[i_r_dim] = r_p_arr_1d + i_r_dim * N_p;
+  }
+
+  // `v_p_arr`
+  double **v_p_arr = new double*[N_r_dim];
+  double *v_p_arr_1d = new double[r_p_arr_size];
+  for (int i_r_dim = 0; i_r_dim < N_r_dim; i_r_dim++) {
+    v_p_arr[i_r_dim] = v_p_arr_1d + i_r_dim * N_p;
+  }
+  
+  // `psi_arr`
+  cplxd **psi_arr = new cplxd*[N_lm];
+  psi_arr[0] = wf.begin();  // new cplxd[N_lm*N_rho];
+  for (int i_lm=0; i_lm<N_lm; i_lm++) 
+  { psi_arr[i_lm] = psi_arr[0] + i_lm * N_rho; }
+  
+  // `r_p_t_arr`
+  double **r_p_t_arr = new double*[N_t];
+  double *r_p_t_arr_1d = new double[N_t*r_p_arr_size];
+  for (int i_t = 0; i_t < N_t; i_t++) 
+  { r_p_t_arr[i_t] = r_p_t_arr_1d + i_t * r_p_arr_size; }
+  
+  // `v_p_t_arr`
+  double **v_p_t_arr = new double*[N_t];
+  double *v_p_t_arr_1d = new double[N_t*r_p_arr_size];
+  for (int i_t = 0; i_t < N_t; i_t++) 
+  { v_p_t_arr[i_t] = v_p_t_arr_1d + i_t * r_p_arr_size; }
+
+
+  // Define variables for looping
+  double *r_p_p, *r_p_p_max = r_p_p_max = r_p_arr_1d + r_p_arr_size;
+  
+
+
+
+  //// Initialization
+
+  const double rho_p_lim[2] = { 0.0, para_tsurff.getDouble("R-tsurff") };
+
+  // `rho_p_arr`
+  double *rho_p_arr = new double[N_p];
+  double delta_rho_p = (13.0 - rho_p_lim[0]) / (N_p+1);
+  for (int i_p = 0; i_p < N_p; i_p++) {
+    rho_p_arr[i_p] = delta_rho_p * (i_p + 1);
+  }
+//  double rho_p_arr[N_p] = {0.5, 1.0, 2.1, 2.4};
+  for (int i_p = 0; i_p < N_p; i_p++) {
+    r_p_arr[0][i_p] = rho_p_arr[i_p];
+    r_p_arr[1][i_p] = 0.3 * M_PI;
+    r_p_arr[2][i_p] = 0.0;
+  }
+
+  // Construct radial coordinate grid points `rho_arr`
+//  const double delta_rho = (rho_max - 0) / (N_rho);
+  const double delta_rho = delta_r;
+ 
+  double *rho_arr = new double[N_rho];
+  for (int i_rho = 0; i_rho < N_rho; i_rho++) 
+  { rho_arr[i_rho] = g_prop.r(i_rho); } // (i_rho+1) * delta_rho; 
+
+  // `v_p_arr`
+  return_code = eval_v_p_arr_for_sph_harm_basis(
+      N_s, N_p, N_r_dim, 
+      N_rho, N_lm,
+      r_p_arr, psi_arr, 
+      rho_arr, l_arr, m_arr, rho_p_lim, 
+      v_p_arr);
+
+  if (return_code != EXIT_SUCCESS) {
+    fprintf(stderr, "[ERROR] Failed to run 'eval_psi_and_dpsidx_arr()'");
+    return return_code;
+  }
+
+  // `r_p_t_arr_1d` and `v_p_t_arr_1d` at t=t_0
+  std::copy(r_p_arr_1d,r_p_arr_1d+r_p_arr_size,r_p_t_arr_1d+0*r_p_arr_size);
+  std::copy(v_p_arr_1d,v_p_arr_1d+r_p_arr_size,v_p_t_arr_1d+0*r_p_arr_size);
+
+
+
+
+
+  const int N_st = 4;
+
+  double A[N_st][N_st] = { {0,0,0,0},{0.5,0,0,0},{0,0.5,0,0,},{0,0,1,0} };
+  const double c[N_st] = {0.0, 0.5, 0.5, 1.0};
+  const double b[N_st] = {1.0/6.0,1.0/3.0,1.0/3.0,1.0/6.0};
+  
+  //// Allocate temporary buffer
+  double ***k_st_arr = new double**[N_st];
+  double **k_st_arr_2d = new double*[N_st*N_r_dim];
+  double *k_st_arr_1d = new double[N_st*N_r_dim*N_p];
+  for (int i_st = 0; i_st < N_st; i_st++) {
+    k_st_arr[i_st] = k_st_arr_2d + i_st * N_r_dim;
+    for (int i_st_r_dim = 0; i_st_r_dim < N_st*N_r_dim; i_st_r_dim++) {
+      k_st_arr_2d[i_st_r_dim] = k_st_arr_1d + i_st_r_dim * N_p;
+    }
+  }
+
+
+
+  double **r_p_i_st_arr = new double*[N_r_dim];
+  double *r_p_i_st_arr_1d = new double[r_p_arr_size];
+  for (int i_r_dim = 0; i_r_dim < N_r_dim; i_r_dim++) {
+    r_p_i_st_arr[i_r_dim] = r_p_i_st_arr_1d + i_r_dim * N_p;
+  }
+  
+  double *k_p; // *k_p_max;
+  double a_i_k;
+
+
+
+  double _delta_t, _delta_inner_t;
+  int i_st, i_k, i_t = 1;
+
+#endif // BOHM
+
+
+
   for (long ts=start_time_index; ts < max_time_index; ts++) {
     const double time=real_timestep*double(ts);
-    // save the orbitals \varphi_{\ell}(\RI) and the derivative \partial_r\varphi_{\ell}(r)|_{r=\RI}
-    tsurff_save_wf(wf);
 
     if (ts%ldumpwidth==0) {
       // calculate total energy, projection onto initial state, norm, and <z>
@@ -316,27 +486,173 @@ int real_prop(int argc, char **argv) {
       fprintf(file_obser, "%15.10le %15.10le %15.10le %15.10le %15.10le\n", 
           time, E_tot, real(conj(P)*P), N, z_expect);
     };
-    //
-    // propagate one step forward in (real) time.
-    // 
+    
+    // save the orbitals \varphi_{\ell}(\RI) and the derivative \partial_r\varphi_{\ell}(r)|_{r=\RI}
+    tsurff_save_wf(wf);
+
+#ifdef BOHM
+    _delta_t = real_timestep;
+    
+    //// Eval k1 (assuming v_p_arr is already k1, provided c[0] == 0)
+    i_st = 0;
+    std::copy(v_p_arr_1d, v_p_arr_1d + r_p_arr_size, k_st_arr[i_st][0]);
+
+
+
+    for (i_st = 1; i_st < N_st; i_st++) {
+    
+      _delta_inner_t = c[i_st-1] - c[i_st];
+
+      // Eval y_i_st
+      std::copy(r_p_arr_1d, r_p_arr_1d + r_p_arr_size, r_p_i_st_arr_1d);
+      for (i_k=0; i_k < i_st; i_k++) 
+      {
+        a_i_k = A[i_st][i_k];
+
+        for(r_p_p = r_p_i_st_arr_1d, 
+            r_p_p_max = r_p_i_st_arr_1d + r_p_arr_size, 
+            k_p = k_st_arr[i_k][0]; 
+            r_p_p < r_p_p_max; r_p_p++, k_p++) 
+        {
+          *r_p_p += a_i_k * *k_p;
+        }
+
+      } // for-loop : i_k
+      
+
+      // Eval psi at t_i_st = t_n + c_i_st * _delta_t
+      if (_delta_inner_t != 0) {
+        wf.propagate(timestep, time, g_prop, hamilton, me, staticpot, my_m_quantum_num, nuclear_charge);
+//        return_code = propa_psi_arr(
+//            psi_arr, _delta_inner_t*_delta_t, N_rho,N_lm,qprop_dim,initial_m);
+//        if (return_code != EXIT_SUCCESS) {
+//          return return_with_mesg("Failed during propagation of 'psi_arr'");
+//        }
+      }
+
+
+      // Eval k
+      return_code = eval_v_p_arr_for_sph_harm_basis(
+          N_s, N_p, N_r_dim, N_rho, N_lm, r_p_i_st_arr, psi_arr, 
+          rho_arr, l_arr, m_arr, rho_p_lim, k_st_arr[i_st]);
+      if (return_code != EXIT_SUCCESS) {
+        return return_with_mesg("Failed to run 'eval_psi_and_dpsidx_arr()");
+      }
+
+    } // for-loop : i_st
+
+
+    for (i_st = 0; i_st < N_st; i_st++) {
+      for(r_p_p = r_p_arr_1d, 
+          r_p_p_max = r_p_arr_1d + r_p_arr_size, 
+          k_p = k_st_arr[i_st][0]; 
+          r_p_p < r_p_p_max; r_p_p++, k_p++) 
+      {
+        *r_p_p += _delta_t * b[i_st] * *k_p;
+      }
+    } // for-loop : i_st
+
+    //// Evaluate velocity vector for each particle
+    return_code = eval_v_p_arr_for_sph_harm_basis(
+        N_s, N_p, N_r_dim, N_rho, N_lm, r_p_arr, psi_arr, 
+        rho_arr, l_arr, m_arr, rho_p_lim, v_p_arr);
+    if (return_code != EXIT_SUCCESS) {
+      return return_with_mesg("Failed to run 'eval_psi_and_dpsidx_arr()");
+    }
+    
+
+    //// Store `r_p_arr` and `v_p_arr`
+    std::copy(
+        r_p_arr_1d, r_p_arr_1d + r_p_arr_size,
+        r_p_t_arr_1d + (i_t) * r_p_arr_size);
+    std::copy(
+        v_p_arr_1d, v_p_arr_1d + r_p_arr_size,
+        v_p_t_arr_1d + (i_t) * r_p_arr_size);
+
+
+    //// Update time index
+    i_t++;
+
+#else // BOHM
+    
+    // propagate one step forward in (real) time. 
     wf.propagate(timestep, time, g_prop, hamilton, me, staticpot, my_m_quantum_num, nuclear_charge);
 
-    if (ts%(ldumpwidth*10)==0) {
-      cout << "timestep " << ts << " of " << lno_of_ts << ", Norm of wave function: " << N << endl;
+#endif // BOHM
+    
+
+    if ((ts+1)%(ldumpwidth*10)==0) {
+      cout << "timestep " << ts+1 << " of " << lno_of_ts+1 << ", Norm of wave function: " << N << endl;
     };
-    if (ts % (wf_backup_period) == 0) {
+    if ((ts+1)% (wf_backup_period) == 0) {
       std::ofstream current_wf_bin_file(current_wf_bin_file_name, std::ios::binary);
       if (wf.dump_to_file_binary(current_wf_bin_file)) {
         std::cerr << "[ERROR] Failed to save wavefunction to " << current_wf_bin_file_name << endl;
         return 1; }
       current_wf_bin_file.close();
       cout << "[ LOG ] Wavefunction have been saved to " << current_wf_bin_file_name 
-        << " at timestep " << ts << " of " << lno_of_ts << endl;
+        << " at timestep " << ts+1 << " of " << lno_of_ts+1 << endl;
     }
   }; // end of real-time-propagation loop
 #ifdef HAVE_BOOST
     cout << "time step took " << tim.elapsed() << " seconds" << endl;
 #endif
+
+
+
+#ifdef BOHM
+  const size_t traj_file_size = N_t * r_p_arr_size * sizeof(double);
+  string file_name_traj_r_t = string("traj-r-t.bin");
+  string file_name_traj_v_t = string("traj-v-t.bin");
+
+  std::ofstream file_traj_r_t;
+  fprintf(stdout,"[ LOG ] Writing trajectory position to file: '%s' ... ", 
+      file_name_traj_r_t.c_str());
+  file_traj_r_t.open(file_name_traj_r_t, std::ios::binary);
+  file_traj_r_t.write((char *) r_p_t_arr_1d, traj_file_size);
+  file_traj_r_t.close();
+  fprintf(stdout,"done\n");
+
+  std::ofstream file_traj_v_t;
+  fprintf(stdout,"[ LOG ] Writing trajectory velocity to file: '%s' ... ", 
+      file_name_traj_v_t.c_str());
+  file_traj_v_t.open(file_name_traj_v_t, std::ios::binary);
+  file_traj_v_t.write((char *) v_p_t_arr_1d, traj_file_size);
+  file_traj_v_t.close();
+  fprintf(stdout,"done\n");
+
+//  print_bar();
+//
+//  printf("r_p_t_arr: \n");
+//  for (int i_t = 0; i_t < N_t; i_t++) {
+//    print_3vec_p_arr(r_p_t_arr[i_t],N_p,N_r_dim);
+//    printf("\n");
+//  } 
+//  print_bar();
+
+
+  delete [] l_arr;
+  delete [] m_arr;
+
+  delete [] k_st_arr_1d;
+  delete [] k_st_arr_2d;
+  delete [] k_st_arr;
+  delete [] r_p_i_st_arr_1d;
+  delete [] r_p_i_st_arr;
+  
+  // Deallocate memory for arrays
+  delete [] r_p_arr[0];
+  delete [] r_p_arr;
+  delete [] v_p_arr[0];
+  delete [] v_p_arr;
+//  delete [] psi_arr[0];
+  delete [] psi_arr;
+  delete [] r_p_t_arr_1d;
+  delete [] r_p_t_arr;
+
+#endif // BOHM
+
+
 
   fclose(file_obser);
 

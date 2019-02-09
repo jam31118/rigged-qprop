@@ -44,7 +44,7 @@ BASE_FLAGS = [
 
     # `matrix` package flags
     '-I{}/dep/matrix/include'.format(environ['QPROP_HOME']),
-    '-I{}/dep/matrix/lib'.format(environ['QPROP_HOME']),
+    '-L{}/dep/matrix/lib'.format(environ['QPROP_HOME']),
 #    '-L../../dep/matrix/lib',
 #    '-I../../dep/matrix/include',
     '-lmatrix',
@@ -54,6 +54,10 @@ BASE_FLAGS = [
     #'-I./core'
     '-I{}/boost/include'.format(environ['QPROP_DEP_DIR']),
     '-DHAVE_BOOST',
+
+    '-DBOHM',
+    '-I{}/dep/cbohm/include'.format(environ['QPROP_HOME']),
+    '-L{}/dep/cbohm/lib'.format(environ['QPROP_HOME']),
 ]
 
 SOURCE_EXTENSIONS = [  

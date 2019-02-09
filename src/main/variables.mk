@@ -19,4 +19,11 @@ MATRIX_FLAGS = -L$(MATRIX_HOME)/lib -I$(MATRIX_HOME)/include -lmatrix
 CU_PROP_HOME = $(QPROP_HOME)/dep/cu-tridiag
 CU_PROP_FLAGS = -L$(CU_PROP_HOME)/lib -I$(CU_PROP_HOME)/include -lcu_propagator
 
+CBOHM_HOME = $(QPROP_HOME)/dep/cbohm
+CBOHM_LIB_DIR = $(CBOHM_HOME)/lib
+CBOHM_INC_DIR = $(CBOHM_HOME)/include
+CBOHM_LIB_FLAGS = -L$(CBOHM_LIB_DIR) -lcbohm
+CBOHM_INC_FLAGS = -I$(CBOHM_INC_DIR)
+
+
 

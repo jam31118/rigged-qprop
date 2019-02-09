@@ -13,7 +13,9 @@ ppp_bin = ppp
 ppp_mpi_bin = ppp-mpi
 ppp_gpu_bin = ppp-gpu
 
-bin_list = $(imag_bin) $(real_bin) $(eval_bin) $(eval_mpi_bin) $(ppp_bin) $(ppp_mpi_bin) $(ppp_gpu_bin)
+real_bohm_bin = real-prop-bohm
+
+bin_list = $(imag_bin) $(real_bin) $(eval_bin) $(eval_mpi_bin) $(ppp_bin) $(real_bohm_bin) # $(ppp_gpu_bin) $(ppp_mpi_bin) 
 
 MPICXX ?= $(CXX)
 
@@ -40,6 +42,9 @@ $(ppp_mpi_bin): ppp.cc libqprop.a libmatrix.a
 $(ppp_gpu_bin): ppp.cc libqprop.a libmatrix.a libcu_propagator.so
 	$(CXX) -std=c++0x $< -o $@ $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS) $(CU_PROP_FLAGS) $(CUDA_LIB_FLAGS) -DHAVE_CUDA -DHAVE_BOOST
 
+$(real_bohm_bin) : libqprop.a real-prop.cc real-prop-main.cc $(CBOHM_LIB_DIR)/libcbohm.so
+	$(CXX) $(optimargs) -std=c++0x real-prop-main.cc real-prop.cc -o $@ -I. -I$(QPROP_SRC)/base -lqprop -lm $(gslargs) -L$(QPROP_SRC)/../lib/x86_64 $(boostargs) $(CBOHM_LIB_FLAGS) $(CBOHM_INC_FLAGS) -Wl,-rpath=$(CBOHM_LIB_DIR) -DHAVE_BOOST -DBOHM
+
 
 install: $(bin_list)
 	if [ ! -d "$(QPROP_BIN)" ]; then mkdir $(QPROP_BIN); fi
@@ -53,6 +58,9 @@ libmatrix.a:
 
 libcu_propagator.so:
 	+$(MAKE) install -C $(CU_PROP_HOME)
+
+$(CBOHM_LIB_DIR)/libcbohm.so:
+	+$(MAKE) install -C $(CBOHM_HOME)
 
 clean: clean-bin
 	cd $(QPROP_SRC)/base/ && $(MAKE) clean

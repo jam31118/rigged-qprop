@@ -338,6 +338,8 @@ int real_prop(int argc, char **argv) {
   int *m_arr = new int[N_lm];
   if ( eval_l_m_arr(qprop_dim, N_l, l_arr, m_arr, initial_m) != EXIT_SUCCESS )
   { return return_with_mesg("Failed to evaluate 'l_arr', 'm_arr'"); }
+
+  
   
   
   //// Define useful variables
@@ -394,7 +396,7 @@ int real_prop(int argc, char **argv) {
 
   // `rho_p_arr`
   double *rho_p_arr = new double[N_p];
-  double delta_rho_p = (13.0 - rho_p_lim[0]) / (N_p+1);
+  double delta_rho_p = (20.0 - rho_p_lim[0]) / (N_p+1);
   for (int i_p = 0; i_p < N_p; i_p++) {
     rho_p_arr[i_p] = delta_rho_p * (i_p + 1);
   }
@@ -415,14 +417,12 @@ int real_prop(int argc, char **argv) {
 
   // `v_p_arr`
   return_code = eval_v_p_arr_for_sph_harm_basis(
-      N_s, N_p, N_r_dim, 
-      N_rho, N_lm,
-      r_p_arr, psi_arr, 
-      rho_arr, l_arr, m_arr, rho_p_lim, 
-      v_p_arr);
+      N_s, N_p, N_rho, N_lm, r_p_arr, (const cplxd**) psi_arr, 
+      rho_arr, l_arr, m_arr, rho_p_lim, v_p_arr);
 
   if (return_code != EXIT_SUCCESS) {
-    fprintf(stderr, "[ERROR] Failed to run 'eval_psi_and_dpsidx_arr()'");
+    fprintf(stderr, "[ERROR] Failed to run "
+        "'eval_v_p_arr_for_sph_harm_basis()'");
     return return_code;
   }
 
@@ -522,7 +522,9 @@ int real_prop(int argc, char **argv) {
 
       // Eval psi at t_i_st = t_n + c_i_st * _delta_t
       if (_delta_inner_t != 0) {
-        wf.propagate(timestep, time, g_prop, hamilton, me, staticpot, my_m_quantum_num, nuclear_charge);
+        wf.propagate(
+            timestep, time, g_prop, hamilton, me, staticpot, 
+            my_m_quantum_num, nuclear_charge);
 //        return_code = propa_psi_arr(
 //            psi_arr, _delta_inner_t*_delta_t, N_rho,N_lm,qprop_dim,initial_m);
 //        if (return_code != EXIT_SUCCESS) {
@@ -533,7 +535,7 @@ int real_prop(int argc, char **argv) {
 
       // Eval k
       return_code = eval_v_p_arr_for_sph_harm_basis(
-          N_s, N_p, N_r_dim, N_rho, N_lm, r_p_i_st_arr, psi_arr, 
+          N_s, N_p, N_rho, N_lm, r_p_i_st_arr, (const cplxd **) psi_arr, 
           rho_arr, l_arr, m_arr, rho_p_lim, k_st_arr[i_st]);
       if (return_code != EXIT_SUCCESS) {
         return return_with_mesg("Failed to run 'eval_psi_and_dpsidx_arr()");
@@ -554,7 +556,7 @@ int real_prop(int argc, char **argv) {
 
     //// Evaluate velocity vector for each particle
     return_code = eval_v_p_arr_for_sph_harm_basis(
-        N_s, N_p, N_r_dim, N_rho, N_lm, r_p_arr, psi_arr, 
+      N_s, N_p, N_rho, N_lm, r_p_arr, (const cplxd**) psi_arr, 
         rho_arr, l_arr, m_arr, rho_p_lim, v_p_arr);
     if (return_code != EXIT_SUCCESS) {
       return return_with_mesg("Failed to run 'eval_psi_and_dpsidx_arr()");

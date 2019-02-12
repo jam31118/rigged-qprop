@@ -501,7 +501,7 @@ int real_prop(int argc, char **argv) {
 
     for (i_st = 1; i_st < N_st; i_st++) {
     
-      _delta_inner_t = c[i_st-1] - c[i_st];
+      _delta_inner_t = c[i_st] - c[i_st-1];
 
       // Eval y_i_st
       std::copy(r_p_arr_1d, r_p_arr_1d + r_p_arr_size, r_p_i_st_arr_1d);
@@ -523,7 +523,8 @@ int real_prop(int argc, char **argv) {
       // Eval psi at t_i_st = t_n + c_i_st * _delta_t
       if (_delta_inner_t != 0) {
         wf.propagate(
-            timestep, time, g_prop, hamilton, me, staticpot, 
+            _delta_inner_t * timestep, time + c[i_st] * real_timestep, 
+            g_prop, hamilton, me, staticpot, 
             my_m_quantum_num, nuclear_charge);
 //        return_code = propa_psi_arr(
 //            psi_arr, _delta_inner_t*_delta_t, N_rho,N_lm,qprop_dim,initial_m);

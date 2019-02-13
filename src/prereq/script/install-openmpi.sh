@@ -58,7 +58,7 @@ fi
 
 tar xzvf $SRC_TARBALL
 cd $BUILD_DIR
-$SRC_DIR/configure --prefix=$INSTALL_DIR --enable-mpi-cxx --with-tm
+$SRC_DIR/configure --prefix=$INSTALL_DIR --enable-mpi-cxx #--with-tm
 make -j4
 make install
 

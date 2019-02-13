@@ -13,8 +13,8 @@ ppp_bin = ppp
 ppp_mpi_bin = ppp-mpi
 ppp_gpu_bin = ppp-gpu
 
-bin_list = $(imag_bin) $(real_bin) $(eval_bin) $(eval_mpi_bin) 
-ext_bin_list = $(ppp_bin) $(ppp_mpi_bin) $(ppp_gpu_bin)
+bin_list = $(imag_bin) $(real_bin) $(eval_bin) $(eval_mpi_bin) $(ppp_bin) $(ppp_mpi_bin) 
+ext_bin_list = $(ppp_gpu_bin)
 total_bin_list = $(bin_list) $(ext_bin_list)
 
 MPICXX ?= $(CXX)
@@ -25,7 +25,7 @@ $(imag_bin) : libqprop.a imag-prop.cc imag-prop-main.cc
 	$(CXX) $(optimargs) -std=c++0x imag-prop-main.cc imag-prop.cc -o $@ -I. -I$(QPROP_SRC)/base -L$(QPROP_SRC)/../lib/x86_64 -lqprop -lm 
 
 $(real_bin) : libqprop.a real-prop.cc real-prop-main.cc
-	$(CXX) $(optimargs) -std=c++0x real-prop-main.cc real-prop.cc -o $@ -I. -I$(QPROP_SRC)/base -lqprop -lm $(gslargs) -L$(QPROP_SRC)/../lib/x86_64 $(boostargs) -DHAVE_BOOST 
+	$(CXX) $(optimargs) -std=c++0x real-prop-main.cc real-prop.cc -o $@ -I. -I$(QPROP_SRC)/base -lqprop -lm -I$(GSLHOME)/include -L$(QPROP_SRC)/../lib/x86_64 -I$(BOOSTHOME)/include -DHAVE_BOOST 
 
 $(eval_bin) : libqprop.a eval-tsurff.cc eval-tsurff-main.cc
 	$(CXX) $(optimargs) -std=c++0x eval-tsurff-main.cc eval-tsurff.cc -o $@ -I. -I$(QPROP_SRC)/base -lqprop -lm $(gslargs) -L$(QPROP_SRC)/../lib/x86_64
@@ -35,11 +35,9 @@ $(eval_mpi_bin) : libqprop.a eval-tsurff-mpi.cc eval-tsurff-mpi-main.cc
 
 $(ppp_bin): ppp.cc libqprop.a libmatrix.a 
 	$(CXX) -std=c++0x $< -o $@ $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS) -DHAVE_BOOST
-	$(MAKE) move-bin
 
 $(ppp_mpi_bin): ppp.cc libqprop.a libmatrix.a
 	$(CXX) -std=c++0x $< -o $@ $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS) $(mpiargs) -DHAVE_MPI -DHAVE_BOOST
-	$(MAKE) move-bin
 
 $(ppp_gpu_bin): ppp.cc libqprop.a libmatrix.a libcu_propagator.so
 	$(CXX) -std=c++0x $< -o $@ $(optimargs) $(QPROP_FLAGS) $(MATRIX_FLAGS) $(CU_PROP_FLAGS) $(CUDA_LIB_FLAGS) -DHAVE_CUDA -DHAVE_BOOST

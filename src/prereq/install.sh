@@ -16,8 +16,12 @@ fi
 
 if [ ! -d "$QPROP_DEP_DIR" ]
 then
-  (>&2 echo -e "${ERROR} Please set \$QPROP_DEP_DIR to valid path where you want to install dependencies of QPROP")
-  exit -1
+  mkdir $QPROP_DEP_DIR
+  if [ "$?" -ne "0" ]
+  then 
+    (>&2 echo -e "${ERROR} Please set \$QPROP_DEP_DIR to valid path where you want to install dependencies of QPROP")
+    exit -1
+  fi
 fi
 
 

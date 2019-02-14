@@ -4,6 +4,7 @@
 #include "log.hh"
 #include "lm.hh"
 #include "velocity.hh"
+#include "ode.hh"
 #endif // BOHM
 
 using std::endl;
@@ -463,8 +464,9 @@ int real_prop(int argc, char **argv) {
   double a_i_k;
 
 
-
-  double _delta_t, _delta_inner_t;
+  vec_t r_p_t_vec;
+  const double root_thres = 1e-10;
+  double _delta_t, _delta_inner_t, _inner_t;
   int i_st, i_k, i_t = 1;
 
 #endif // BOHM
@@ -491,69 +493,90 @@ int real_prop(int argc, char **argv) {
     tsurff_save_wf(wf);
 
 #ifdef BOHM
+
+    //// configure time
     _delta_t = real_timestep;
+    _delta_inner_t = 1.0;
+    _inner_t = 0.0;
     
-    //// Eval k1 (assuming v_p_arr is already k1, provided c[0] == 0)
-    i_st = 0;
-    std::copy(v_p_arr_1d, v_p_arr_1d + r_p_arr_size, k_st_arr[i_st][0]);
-
-
-
-    for (i_st = 1; i_st < N_st; i_st++) {
     
-      _delta_inner_t = c[i_st] - c[i_st-1];
+    for (int i_p = 0; i_p < N_p; i_p++) {
 
-      // Eval y_i_st
-      std::copy(r_p_arr_1d, r_p_arr_1d + r_p_arr_size, r_p_i_st_arr_1d);
-      for (i_k=0; i_k < i_st; i_k++) 
-      {
-        a_i_k = A[i_st][i_k];
+      wf.propagate(
+          _delta_inner_t * timestep, time + _inner_t * real_timestep, 
+          g_prop, hamilton, me, staticpot, 
+          my_m_quantum_num, nuclear_charge);
 
-        for(r_p_p = r_p_i_st_arr_1d, 
-            r_p_p_max = r_p_i_st_arr_1d + r_p_arr_size, 
-            k_p = k_st_arr[i_k][0]; 
-            r_p_p < r_p_p_max; r_p_p++, k_p++) 
-        {
-          *r_p_p += a_i_k * *k_p;
-        }
+      for (int i_dim = 0; i_dim < DIM_R; i_dim++)
+      { r_p_t_vec[i_dim] = r_p_arr[i_dim][i_p]; }
 
-      } // for-loop : i_k
-      
+      return_code = prop_implicit_euler_in_sph_harm_basis(
+          N_s, N_rho, N_lm, (const std::complex<double> **) psi_arr, 
+          rho_arr, l_arr, m_arr, rho_p_lim, _delta_t, root_thres, r_p_t_vec);
+      if (return_code != EXIT_SUCCESS) 
+      { return debug_mesg("Failed during implicit Euler routine"); }
 
-      // Eval psi at t_i_st = t_n + c_i_st * _delta_t
-      if (_delta_inner_t != 0) {
-        wf.propagate(
-            _delta_inner_t * timestep, time + c[i_st] * real_timestep, 
-            g_prop, hamilton, me, staticpot, 
-            my_m_quantum_num, nuclear_charge);
-//        return_code = propa_psi_arr(
-//            psi_arr, _delta_inner_t*_delta_t, N_rho,N_lm,qprop_dim,initial_m);
-//        if (return_code != EXIT_SUCCESS) {
-//          return return_with_mesg("Failed during propagation of 'psi_arr'");
+      for (int i_dim = 0; i_dim < DIM_R; i_dim++)
+      { r_p_arr[i_dim][i_p] = r_p_t_vec[i_dim]; }
+
+    } // end-for-loop : `i_p`
+
+       
+//    //// Eval k1 (assuming v_p_arr is already k1, provided c[0] == 0)
+//    i_st = 0;
+//    std::copy(v_p_arr_1d, v_p_arr_1d + r_p_arr_size, k_st_arr[i_st][0]);
+//
+//    for (i_st = 1; i_st < N_st; i_st++) {
+//    
+//      _delta_inner_t = c[i_st] - c[i_st-1];
+//
+//      // Eval y_i_st
+//      std::copy(r_p_arr_1d, r_p_arr_1d + r_p_arr_size, r_p_i_st_arr_1d);
+//      for (i_k=0; i_k < i_st; i_k++) 
+//      {
+//        a_i_k = A[i_st][i_k];
+//
+//        for(r_p_p = r_p_i_st_arr_1d, 
+//            r_p_p_max = r_p_i_st_arr_1d + r_p_arr_size, 
+//            k_p = k_st_arr[i_k][0]; 
+//            r_p_p < r_p_p_max; r_p_p++, k_p++) 
+//        {
+//          *r_p_p += a_i_k * *k_p;
 //        }
-      }
+//
+//      } // for-loop : i_k
+//      
+//
+//      // Eval psi at t_i_st = t_n + c_i_st * _delta_t
+//      if (_delta_inner_t != 0) {
+//        wf.propagate(
+//            _delta_inner_t * timestep, time + c[i_st] * real_timestep, 
+//            g_prop, hamilton, me, staticpot, 
+//            my_m_quantum_num, nuclear_charge);
+//      }
+//
+//      // Eval k
+//      return_code = eval_v_p_arr_for_sph_harm_basis(
+//          N_s, N_p, N_rho, N_lm, r_p_i_st_arr, (const cplxd **) psi_arr, 
+//          rho_arr, l_arr, m_arr, rho_p_lim, k_st_arr[i_st]);
+//      if (return_code != EXIT_SUCCESS) {
+//        return return_with_mesg("Failed to run 'eval_psi_and_dpsidx_arr()");
+//      }
+//
+//    } // for-loop : i_st
+//
+//
+//    //// Eval next step's position vector
+//    for (i_st = 0; i_st < N_st; i_st++) {
+//      for(r_p_p = r_p_arr_1d, 
+//          r_p_p_max = r_p_arr_1d + r_p_arr_size, 
+//          k_p = k_st_arr[i_st][0]; 
+//          r_p_p < r_p_p_max; r_p_p++, k_p++) 
+//      {
+//        *r_p_p += _delta_t * b[i_st] * *k_p;
+//      }
+//    } // for-loop : i_st
 
-
-      // Eval k
-      return_code = eval_v_p_arr_for_sph_harm_basis(
-          N_s, N_p, N_rho, N_lm, r_p_i_st_arr, (const cplxd **) psi_arr, 
-          rho_arr, l_arr, m_arr, rho_p_lim, k_st_arr[i_st]);
-      if (return_code != EXIT_SUCCESS) {
-        return return_with_mesg("Failed to run 'eval_psi_and_dpsidx_arr()");
-      }
-
-    } // for-loop : i_st
-
-
-    for (i_st = 0; i_st < N_st; i_st++) {
-      for(r_p_p = r_p_arr_1d, 
-          r_p_p_max = r_p_arr_1d + r_p_arr_size, 
-          k_p = k_st_arr[i_st][0]; 
-          r_p_p < r_p_p_max; r_p_p++, k_p++) 
-      {
-        *r_p_p += _delta_t * b[i_st] * *k_p;
-      }
-    } // for-loop : i_st
 
     //// Evaluate velocity vector for each particle
     return_code = eval_v_p_arr_for_sph_harm_basis(

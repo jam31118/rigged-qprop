@@ -465,7 +465,7 @@ int real_prop(int argc, char **argv) {
 
 
   vec_t r_p_t_vec;
-  const double root_thres = 1e-10;
+  const double root_thres = 1e-8;
   double _delta_t, _delta_inner_t, _inner_t;
   int i_st, i_k, i_t = 1;
 
@@ -510,11 +510,18 @@ int real_prop(int argc, char **argv) {
       for (int i_dim = 0; i_dim < DIM_R; i_dim++)
       { r_p_t_vec[i_dim] = r_p_arr[i_dim][i_p]; }
 
+
+      bool verbose = false;
+      if (i_p == 11) { verbose = true; }
+
       return_code = prop_implicit_euler_in_sph_harm_basis(
           N_s, N_rho, N_lm, (const std::complex<double> **) psi_arr, 
-          rho_arr, l_arr, m_arr, rho_p_lim, _delta_t, root_thres, r_p_t_vec);
+          rho_arr, l_arr, m_arr, rho_p_lim, _delta_t, root_thres, r_p_t_vec, verbose);
       if (return_code != EXIT_SUCCESS) 
-      { return debug_mesg("Failed during implicit Euler routine"); }
+      { 
+        fprintf(stderr,"[ERROR] i_p=%d\n",i_p);
+        return debug_mesg("Failed during implicit Euler routine"); 
+      }
 
       for (int i_dim = 0; i_dim < DIM_R; i_dim++)
       { r_p_arr[i_dim][i_p] = r_p_t_vec[i_dim]; }

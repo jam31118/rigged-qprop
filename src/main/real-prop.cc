@@ -313,7 +313,7 @@ int real_prop(int argc, char **argv) {
 #ifdef BOHM
   
   //// Configuration
-  const int N_s = 4, N_rho = g_prop.ngps_x();
+  const int N_s = 5, N_rho = g_prop.ngps_x();
   const int N_r_dim = 3, N_l = g_prop.ngps_y(), qprop_dim=g_prop.dimens();
   int N_p_;
   try { N_p_ = para_prop.getLong("num-of-particle"); }
@@ -397,7 +397,7 @@ int real_prop(int argc, char **argv) {
 
   // `rho_p_arr`
   double *rho_p_arr = new double[N_p];
-  double delta_rho_p = (20.0 - rho_p_lim[0]) / (N_p+1);
+  double delta_rho_p = (15.0 - rho_p_lim[0]) / (N_p+1);
   for (int i_p = 0; i_p < N_p; i_p++) {
     rho_p_arr[i_p] = delta_rho_p * (i_p + 1);
   }
@@ -469,6 +469,13 @@ int real_prop(int argc, char **argv) {
   double _delta_t, _delta_inner_t, _inner_t;
   int i_st, i_k, i_t = 1;
 
+
+  
+  //// Prepare adaptive step size
+  wavefunction wf_backup;
+  wf_backup.init(g_prop.size());
+
+
 #endif // BOHM
 
 
@@ -499,30 +506,50 @@ int real_prop(int argc, char **argv) {
     _delta_inner_t = 1.0;
     _inner_t = 0.0;
     
+
+    wf.propagate(
+        _delta_inner_t * timestep, time + _inner_t * real_timestep, 
+        g_prop, hamilton, me, staticpot, 
+        my_m_quantum_num, nuclear_charge);
+
     
     for (int i_p = 0; i_p < N_p; i_p++) {
-
-      wf.propagate(
-          _delta_inner_t * timestep, time + _inner_t * real_timestep, 
-          g_prop, hamilton, me, staticpot, 
-          my_m_quantum_num, nuclear_charge);
 
       for (int i_dim = 0; i_dim < DIM_R; i_dim++)
       { r_p_t_vec[i_dim] = r_p_arr[i_dim][i_p]; }
 
 
+      //// Evaluate initial guess
+      vec_t v_p_vec;
+      return_code = eval_v_p_for_sph_harm_basis(
+          N_s, N_rho, N_lm, r_p_t_vec, (const cplxd **) psi_arr, 
+          rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec, NULL);
+      if (return_code != EXIT_SUCCESS) {
+        return return_with_mesg("Failed to run eval_v_p_arr_for_sph_harm_basis()");
+      }
+      vec_t r_p_vec_initial;
+      for (int i=0; i<DIM_R; i++) {
+        r_p_vec_initial[i] = r_p_t_vec[i] + _delta_t * v_p_vec[i];
+      } 
+      
+
+
+      //// Propagate each particle
       bool verbose = false;
       if (i_p == 11) { verbose = true; }
 
       return_code = prop_implicit_euler_in_sph_harm_basis(
           N_s, N_rho, N_lm, (const std::complex<double> **) psi_arr, 
-          rho_arr, l_arr, m_arr, rho_p_lim, _delta_t, root_thres, r_p_t_vec, verbose);
+          rho_arr, l_arr, m_arr, rho_p_lim, _delta_t, root_thres, r_p_t_vec, r_p_vec_initial, verbose);
       if (return_code != EXIT_SUCCESS) 
       { 
-        fprintf(stderr,"[ERROR] i_p=%d\n",i_p);
+        fprintf(stderr,"[ERROR] i_p=%d / i_time=%d\n",i_p, i_t);
+        fprintf(stderr,"[ERROR] v_p_vec: (%20.15f,%20.15f,%20.15f)\n", v_p_vec[0],v_p_vec[1],v_p_vec[2]);
         return debug_mesg("Failed during implicit Euler routine"); 
       }
 
+
+      //// Store propagated each particle's position to the main memory
       for (int i_dim = 0; i_dim < DIM_R; i_dim++)
       { r_p_arr[i_dim][i_p] = r_p_t_vec[i_dim]; }
 
@@ -531,6 +558,7 @@ int real_prop(int argc, char **argv) {
        
 //    //// Eval k1 (assuming v_p_arr is already k1, provided c[0] == 0)
 //    i_st = 0;
+//    if (c[0] != 0) { return debug_mesg("check whether c[0] is not '0'"); }
 //    std::copy(v_p_arr_1d, v_p_arr_1d + r_p_arr_size, k_st_arr[i_st][0]);
 //
 //    for (i_st = 1; i_st < N_st; i_st++) {

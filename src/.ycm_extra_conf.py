@@ -58,6 +58,12 @@ BASE_FLAGS = [
     '-DBOHM',
     '-I{}/dep/cbohm/include'.format(environ['QPROP_HOME']),
     '-L{}/dep/cbohm/lib'.format(environ['QPROP_HOME']),
+
+    # GSL configuration
+    '-I{}/gsl/include'.format(environ['QPROP_DEP_DIR']),
+    '-L{}/gsl/lib'.format(environ['QPROP_DEP_DIR']),
+    '-lgsl',
+    '-lgslcblas',
 ]
 
 SOURCE_EXTENSIONS = [  

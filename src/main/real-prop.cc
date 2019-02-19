@@ -5,6 +5,7 @@
 #include "lm.hh"
 #include "velocity.hh"
 #include "ode.hh"
+#include "gsl/gsl_multiroots.h"
 #endif // BOHM
 
 using std::endl;
@@ -102,6 +103,9 @@ int real_prop(int argc, char **argv) {
     double pulse_duration_y = vecpot_y.get_duration();
     if ( pulse_duration_x > pulse_duration_y ) { pulse_duration = pulse_duration_x; }
     else { pulse_duration = pulse_duration_y; }
+  } else {
+    fprintf(stderr,"[ERROR] Unexpected grid dimension: %d",g_prop.dimens());
+    return EXIT_FAILURE;
   }
 
 
@@ -465,8 +469,9 @@ int real_prop(int argc, char **argv) {
 
 
   vec_t r_p_t_vec;
-  const double root_thres = 1e-8;
-  double _delta_t, _delta_inner_t, _inner_t;
+  const double root_thres = 1e-10;
+  double _delta_t;
+  double _delta_inner_t, _inner_t;
   int i_st, i_k, i_t = 1;
 
 
@@ -501,11 +506,16 @@ int real_prop(int argc, char **argv) {
 
 #ifdef BOHM
 
+
     //// configure time
     _delta_t = real_timestep;
     _delta_inner_t = 1.0;
     _inner_t = 0.0;
     
+
+    //// Initialize wf_backup for possible go-back for adaptive step size routine
+    std::copy(wf.begin(), wf.begin() + wf.wf_size(), wf_backup.begin());
+
 
     wf.propagate(
         _delta_inner_t * timestep, time + _inner_t * real_timestep, 
@@ -519,37 +529,161 @@ int real_prop(int argc, char **argv) {
       { r_p_t_vec[i_dim] = r_p_arr[i_dim][i_p]; }
 
 
+      //// Starts while-loop for adaptive step-size
+      double _delta_t_trial = _delta_t;
+      const size_t MAX_TRIAL_NUM = 128;
+      double _inner_t_trial = 1.0, _delta_inner_t_trial = 1.0;
+      size_t _num_trial = 1, _i_trial = 1;
+      while (true)
+      {
+
+
       //// Evaluate initial guess
       vec_t v_p_vec;
       return_code = eval_v_p_for_sph_harm_basis(
           N_s, N_rho, N_lm, r_p_t_vec, (const cplxd **) psi_arr, 
           rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec, NULL);
-      if (return_code != EXIT_SUCCESS) {
-        return return_with_mesg("Failed to run eval_v_p_arr_for_sph_harm_basis()");
-      }
-      vec_t r_p_vec_initial;
-      for (int i=0; i<DIM_R; i++) {
-        r_p_vec_initial[i] = r_p_t_vec[i] + _delta_t * v_p_vec[i];
-      } 
-      
+      if (return_code != EXIT_SUCCESS) 
+      { return return_with_mesg("Failed eval_v_p_arr_for_sph_harm_basis()"); }
 
+
+      vec_t r_p_vec_initial;
+      for (int i=0; i<DIM_R; i++) 
+      { r_p_vec_initial[i] = r_p_t_vec[i] + _delta_t_trial * v_p_vec[i]; } 
+
+      return_code = move_to_canonical_range_of_sph_coord(r_p_t_vec);
+      if (return_code != EXIT_SUCCESS) { return debug_mesg("failed transformation"); }
 
       //// Propagate each particle
       bool verbose = false;
       if (i_p == 11) { verbose = true; }
+      
+       
 
-      return_code = prop_implicit_euler_in_sph_harm_basis(
-          N_s, N_rho, N_lm, (const std::complex<double> **) psi_arr, 
-          rho_arr, l_arr, m_arr, rho_p_lim, _delta_t, root_thres, r_p_t_vec, r_p_vec_initial, verbose);
+      bool out_of_range = rho_p_lim[0] > r_p_t_vec[0] or r_p_t_vec[0] >= rho_p_lim[1];
+      if (!out_of_range) {
+          return_code = prop_implicit_euler_in_sph_harm_basis(
+            N_s, N_rho, N_lm, (const std::complex<double> **) psi_arr, 
+            rho_arr, l_arr, m_arr, rho_p_lim, _delta_t_trial, root_thres, 
+            r_p_t_vec, r_p_vec_initial, verbose);
+
+          if (r_p_t_vec[0] == NAN or r_p_t_vec[1] == NAN or r_p_t_vec[2] == NAN)
+          { return debug_mesg("NAN happended"); }
+
+      } else {
+//        fprintf(stderr, "[ LOG ] out of range, skipping propagation");
+      }
+
       if (return_code != EXIT_SUCCESS) 
       { 
-        fprintf(stderr,"[ERROR] i_p=%d / i_time=%d\n",i_p, i_t);
-        fprintf(stderr,"[ERROR] v_p_vec: (%20.15f,%20.15f,%20.15f)\n", v_p_vec[0],v_p_vec[1],v_p_vec[2]);
-        return debug_mesg("Failed during implicit Euler routine"); 
+        fprintf(stderr,"[ LOG ] i_p=%d / i_time=%d / _delta_t_trial=%f\n",
+            i_p, i_t, _delta_t_trial);
+        fprintf(stderr,"[ LOG ] v_p_vec: (%20.15f,%20.15f,%20.15f)\n", 
+            v_p_vec[0],v_p_vec[1],v_p_vec[2]);
+        fprintf(stderr,"[ LOG ] r_p_t_vec: (%20.15f,%20.15f,%20.15f)\n", 
+            r_p_t_vec[0],r_p_t_vec[1],r_p_t_vec[2]);
+
+
+        if (return_code == GSL_ENOPROG or return_code == GSL_ENOPROGJ) {
+          
+//          std::ofstream file_probe("probe.bin", std::ios::binary);
+//          std::ofstream file_probe_r("probe_r.bin", std::ios::binary);
+//          std::ofstream file_probe_rho("probe_rho.bin", std::ios::binary);
+//          std::ofstream file_probe_theta("probe_theta.bin", std::ios::binary);
+//          const double _delta_rho = delta_rho * 0.05;
+//          const double _delta_theta = 0.0007;
+//          vec_t r_p_probe, v_p_vec_probe, g_probe;
+//          for (int i_rho=-200; i_rho<=200; i_rho++) {
+//            for (int i_theta=-201; i_theta<=201; i_theta++) {              
+//              r_p_probe[0] = (i_rho * _delta_rho) + r_p_arr[0][i_p];
+//              r_p_probe[1] = (i_theta * _delta_theta) + r_p_arr[1][i_p];
+//              r_p_probe[2] = r_p_arr[2][i_p];
+//              return_code = eval_v_p_for_sph_harm_basis(
+//                  N_s, N_rho, N_lm, r_p_probe, (const cplxd **) psi_arr, 
+//                  rho_arr, l_arr, m_arr, rho_p_lim, v_p_vec_probe, NULL);
+//              if (return_code != EXIT_SUCCESS)
+//              { return return_with_mesg("Failed eval_v_p_arr_for_sph_harm_basis()"); }
+//              for (int i=0; i<DIM_R; i++) {
+//                g_probe[i] = r_p_probe[i] - r_p_arr[i][i_p] - _delta_t_trial * v_p_vec_probe[i];
+//              }
+//              file_probe.write((char *) g_probe, DIM_R * sizeof(double));
+//              file_probe_r.write((char *) r_p_probe, DIM_R * sizeof(double));
+//            }
+//          }
+//          file_probe.close();
+//          file_probe_r.close();
+//          file_probe_rho.close();
+//          file_probe_theta.close();
+          
+          fprintf(stderr,"[ERROR] GSL error code: '%s'"
+              " so trying again with smaller time step\n", 
+              gsl_strerror(return_code));
+
+          break;
+
+//          return debug_mesg("quit");
+
+
+
+          std::copy(wf_backup.begin(), 
+              wf_backup.begin() + wf_backup.wf_size(), wf.begin());
+
+          _i_trial = 0; _inner_t_trial = 0.0; _delta_inner_t_trial *= 0.5;
+          _delta_t_trial = _delta_t * _delta_inner_t_trial;
+          _num_trial *= 2;
+
+          // Initialize r_p_t_vec
+          for (int i_dim = 0; i_dim < DIM_R; i_dim++)
+          { r_p_t_vec[i_dim] = r_p_arr[i_dim][i_p]; }
+//          _do_continue = true;
+//          continue;
+
+        } else {
+          return debug_mesg("Failed during implicit Euler routine"); 
+        }
       }
+      
+
+
+      if (_num_trial > MAX_TRIAL_NUM) {
+        fprintf(stderr,"[ERROR] delta_t fraction (_delta_inner_t_trial): %f\n", _delta_inner_t_trial);
+        return debug_mesg("MAX_TRIAL_NUM exceeded");
+      
+      } else if (_i_trial < _num_trial) {
+
+        return debug_mesg("ERROR");
+
+        if (_num_trial > 1) { 
+          fprintf(stderr,"[ LOG ] propagate will start soon with delta_t: %f\n", _delta_inner_t_trial * timestep.real());
+          fprintf(stderr,"[ LOG ] _i_trial: %lu\n", _i_trial);
+        }
+        wf.propagate(
+            _delta_inner_t_trial * timestep, 
+            time + _inner_t_trial * _delta_t, 
+            g_prop, hamilton, me, staticpot, 
+            my_m_quantum_num, nuclear_charge);
+        _i_trial++;
+        _inner_t_trial += _delta_inner_t_trial;
+        continue;
+
+      } else {
+
+        if (_i_trial != _num_trial or (_inner_t_trial * _delta_t - _delta_t) > 1e-15)
+        { return debug_mesg("inconsistent trial index or inner_t"); }
+        break;  // break trial-while-loop
+
+      }  // if 
+
+
+      } // while-loop
+
 
 
       //// Store propagated each particle's position to the main memory
+     
+//      if (v_p_arr[0][i_p] == std::nan("") or v_p_arr[1][i_p] == std::nan("") or v_p_arr[2][i_p] == std::nan(""))
+//      { return debug_mesg("NAN happended"); }
+
       for (int i_dim = 0; i_dim < DIM_R; i_dim++)
       { r_p_arr[i_dim][i_p] = r_p_t_vec[i_dim]; }
 
@@ -617,9 +751,8 @@ int real_prop(int argc, char **argv) {
     return_code = eval_v_p_arr_for_sph_harm_basis(
       N_s, N_p, N_rho, N_lm, r_p_arr, (const cplxd**) psi_arr, 
         rho_arr, l_arr, m_arr, rho_p_lim, v_p_arr);
-    if (return_code != EXIT_SUCCESS) {
-      return return_with_mesg("Failed to run 'eval_psi_and_dpsidx_arr()");
-    }
+    if (return_code != EXIT_SUCCESS) 
+    { return return_with_mesg("Failed to run 'eval_psi_and_dpsidx_arr()"); }
     
 
     //// Store `r_p_arr` and `v_p_arr`
@@ -745,6 +878,8 @@ int real_prop(int argc, char **argv) {
       cout << "[ LOG ] Run `PPP` for `time_surff`\n";
     }
   };
+
+  return EXIT_SUCCESS;
 };
 //
 // end of main program

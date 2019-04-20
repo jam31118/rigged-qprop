@@ -48,6 +48,8 @@ bool if_exist_get_vecpot_param ( parameterListe& para_prop, char direction,
     vp->E0 = para_prop.getDouble(string("max-electric-field")+suffix);
     vp->num_cycles = para_prop.getDouble(string("num-cycles")+suffix);
     vp->phase_pi = para_prop.getDouble(string("phase-pi")+suffix);
+    try { vp->my_delay = para_prop.getDouble(string("my-delay")+suffix);
+    } catch (std::exception&) { vp->my_delay = 0.0; }    // add delay on sin^2
   } catch (std::exception&) {
     vecpot_set_exist = false;
   }
@@ -129,7 +131,7 @@ int if_exist_get_superposed_vecpot(parameterListe& para, char direction,
         << " and index " << vecpot_index_in_param_name << endl;
       return 1;
     }
-    vp_arr[vecpot_index] = vecpot(vparam.omega, vparam.num_cycles, vparam.E0, vparam.phase_pi * M_PI);
+    vp_arr[vecpot_index] = vecpot(vparam.omega, vparam.num_cycles, vparam.E0, vparam.phase_pi * M_PI, 0, vparam.my_delay);  // add my_delay
   }
   svp = superposed_vecpot(vp_arr, num_of_vecpot);
   return 0;
@@ -142,6 +144,7 @@ void print_vecpot(vecpot& vp, const char *tag) {
   cout << "[ LOG ] - E0 = " << vp.get_E0() << endl;
   cout << "[ LOG ] - num_cycles " << vp.get_num_cycles() << endl;
   cout << "[ LOG ] - phase " << vp.get_phase() << endl;
+  cout << "[ LOG ] - my-delay " << vp.get_delay() << endl;
   cout << "[ LOG ] ---------------------------------" << endl; 
 }
 

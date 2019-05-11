@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# request 'bash' as shell for job
-#$ -S /bin/bash
+# request "/bin/sh" as shell for job
+#$ -S /bin/sh
 
 # Import environment variable from where this job is submitted
 #$ -V
 
 # The Job name 
-#$ -N single
+#$ -N total-single
 
 #$ -o $HOME/job-log/$JOB_NAME.$JOB_ID.log
 #$ -e $HOME/job-log/$JOB_NAME.$JOB_ID.err
@@ -26,6 +26,10 @@ $QPROP_HOME/bin/$bin > $bin.log 2>&1
 echo "[ LOG ] ${bin} finished" >> $log_file
 
 bin=real-prop
+$QPROP_HOME/bin/$bin > $bin.log 2>&1
+echo "[ LOG ] ${bin} finished" >> $log_file
+
+bin=eval-tsurff
 $QPROP_HOME/bin/$bin > $bin.log 2>&1
 echo "[ LOG ] ${bin} finished" >> $log_file
 

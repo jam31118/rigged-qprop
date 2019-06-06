@@ -43,8 +43,9 @@ echo "SRC_DIR: $SRC_DIR"
 echo "BUILD_DIR: $BUILD_DIR"
 
 cd $SRC_DOWN_DIR
-# [NOTE] The `-O` option is to avoid 'File name too long' error from wget
-wget -O $SRC_TARBALL $SRC_URL
+
+curl -LO "$SRC_URL"
+
 if [ "$?" -ne "0" ]
 then
   (>&2 echo "${ERROR} Failed to wget during downloading '$SRC_TARBALL' from '$SRC_URL'")
@@ -58,7 +59,7 @@ fi
 
 tar xzvf $SRC_TARBALL
 cd $BUILD_DIR
-$SRC_DIR/configure --prefix=$INSTALL_DIR --enable-mpi-cxx #--with-tm
+$SRC_DIR/configure --prefix=$INSTALL_DIR --enable-mpi-cxx --with-sge #--with-tm
 make -j4
 make install
 

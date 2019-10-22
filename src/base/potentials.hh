@@ -138,11 +138,17 @@ class scalarpot {
   double get_nuclear_charge() { return nuclear_charge; };
 
   double operator () (double x, double y, double z, double time, int me) const {
-		double Z = nuclear_charge;
+    double Z = nuclear_charge;
     double result = 0;
-		double result0 = - (1 + exp(-alpha*R_co) * (Z - 1)) / R_co;
+    //// 原始
+    double result0 = - (1 + exp(-alpha*R_co) * (Z - 1)) / R_co;
+    //// xe
+    //double result0 = -(1 + 6 * exp(-0.722 * pow(R_co,double(1.8)))) / sqrt(R_co*R_co + 1.218);
     if (x < R_co) {
-			result = - (1 + exp(-alpha*x) * (Z - 1)) / x;
+      //// 原始
+      result = - (1 + exp(-alpha*x) * (Z - 1)) / x;
+      //// xe
+      //result = -(1 + 6 * exp(-0.722 * pow(x, double(1.8)))) / sqrt(x*x + 1.218);
     } else if (x < 2*R_co) {
       result = - (x - R_co) / (R_co)*result0 + result0;
     } else {

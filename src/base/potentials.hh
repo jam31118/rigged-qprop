@@ -9,13 +9,15 @@
 
 double always_zero2(double t, int me);
 double always_zero5(double x, double y, double z, double t, int me);
+double always_zero_imag(long x, long y, long z, double t, grid g); 
+
 
 // The vector potential with sine squared envelope
 class vecpot {
-  double n_c;
-  double phi_cep;
   double omega;
+  double n_c;
   double E_0;
+  double phi_cep;
   double duration;
   double ww;
   double start_time, end_time;
@@ -132,6 +134,10 @@ class scalarpot {
   double alpha;
 
   public:
+  scalarpot(double charge, double co) :
+    nuclear_charge(charge), R_co(co), alpha(1.0) {}
+
+  public:
   scalarpot(double charge, double co, double alpha_in) : 
     nuclear_charge(charge), R_co(co), alpha(alpha_in) {}
 
@@ -160,8 +166,8 @@ class scalarpot {
 
 
 class imagpot {
-  long imag_potential_width;
   double ampl_im;  // amplitude of imaginary absorbing potential  <--------------  100.0 imag pot on,  0.0 off
+  long imag_potential_width;
 public:
   imagpot(long width, double ampl=100.0) : ampl_im(ampl), imag_potential_width(width) {
     //

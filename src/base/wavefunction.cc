@@ -188,7 +188,7 @@ void wavefunction::init(grid g, int inittype, double w, fluid &ells)
 */
 
 
-void wavefunction::init_rlm(grid g, int inittype, double w, fluid &ells, fluid &ms)
+void wavefunction::init_rlm(grid g, int inittype, double w, fluid &ells, fluid &ms, bool dual_m)
 {
   long xindex, yindex, zindex, index_i,index,i,m;
   double x,y,z;
@@ -203,7 +203,7 @@ void wavefunction::init_rlm(grid g, int inittype, double w, fluid &ells, fluid &
       fprintf(stderr, "init_rlm: you are not in rlm-mode!\n");
       exit(-50);
     };
-  if (ms.wf_size() == 2) {
+  if (dual_m) {
     for (xindex=0; xindex<g.ngps_x(); xindex++) {
       x=g.r(xindex);
       for (yindex=0; yindex<g.ngps_y(); yindex++) {

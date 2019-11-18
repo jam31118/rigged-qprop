@@ -202,4 +202,9 @@ class grid {
   long offse_x, offse_y, offse_z;
 };
 
+
+
+long num_of_basis(long qprop_dim, long ell_grid_size);
+
+
 #endif 

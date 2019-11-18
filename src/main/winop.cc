@@ -12,6 +12,7 @@ typedef std::complex<double> cplxd;
 #include <gsl/gsl_sf_legendre.h>
 #include <parameter.hh>
 #include <powers.hh>
+
 // definitions of potentials
 #include "potentials.hh"
 
@@ -26,7 +27,9 @@ void print_banner() {
 };
 
 int main(int argc, char **argv) {
+
   print_banner();
+
   // set verbosity
   const int iv=1;
 
@@ -39,10 +42,12 @@ int main(int argc, char **argv) {
   // set a few essential parameters for the calculation of the spectra
   //
   const int lnoofwfoutput=1;      // 0 -- initial state, 1 -- final state.
-  const long num_energy=max(1l, para_winop.getLong("num-energy"));   // number of energy bins
-  const double energy_max=para_winop.getDouble("energy-max"); // half width of the window operator (72)
+  // number of energy bins
+  const long num_energy=max(1l, para_winop.getLong("num-energy"));  
+  // half width of the window operator (72)
+  const double energy_max=para_winop.getDouble("energy-max"); 
   const double energy_min=para_winop.getDouble("energy-min");
-  const double delta_energy=(energy_max-energy_min)/double(num_energy);
+  const double delta_energy=(energy_max-energy_min)/double(num_energy-1);
   const double gamma=0.5*delta_energy; // width of the bin is 2*gamma
   cout << "gamma: " << gamma << endl;
   const double w_norm=7.0*M_PI*gamma/(32.0*sin(M_PI/8.0));
@@ -53,13 +58,6 @@ int main(int argc, char **argv) {
 
   const int my_m_quantum_num=para_ini.getLong("initial-m");
 
-  //
-  // specify where the wavefunction (to be analyzed) is located
-  //
-  string str_fname_wf=string("real-prop-wf.dat");
-//  string str_fname_wf=string("hydrogen_re-wf.dat");
-  FILE* file_wf=fopen_with_check(str_fname_wf, "r");
-
   // specific angles
   vector<double> theta(num_theta, 0.0);
   vector<double> cos_theta(num_theta, 0.0);
@@ -69,14 +67,15 @@ int main(int argc, char **argv) {
   };
   
   vector<double> phi(num_phi, 0.0);
-  for(long lphi=0; lphi<num_phi; lphi++) 
+  for (long lphi=0; lphi<num_phi; lphi++) {
     phi[lphi]=lphi*2*M_PI/num_phi;
+  }
 
-  const double delta_r=para_ini.getDouble("delta-r");
-  const long qprop_dim=para_ini.getLong("qprop-dim");
-  const long ell_grid_size=para_prop.getLong("ell-grid-size");
+  const double delta_r = para_ini.getDouble("delta-r");
+  const long qprop_dim = para_ini.getLong("qprop-dim");
+  const long ell_grid_size = para_prop.getLong("ell-grid-size");
 
-  grid  g_angle, g_load, g;
+  grid g_angle, g_load, g;
   // this grid is used to store the Y_lm; do not touch this !!!
   g_angle.set_dim(44);  // 44 works for both propagation mode 34 and 44
   g_angle.set_ngps(num_dir, ell_grid_size, 1);
@@ -87,14 +86,27 @@ int main(int argc, char **argv) {
   string current_wf_bin_file_name("current-wf.bin");
   std::fstream fh;
   fh.open(current_wf_bin_file_name, std::ios::in | std::ios::binary);           
-  if (!fh.is_open()) { fprintf(stderr,"[ERROR] during opening file `%s`\n", current_wf_bin_file_name.c_str()); }
+  if (!fh.is_open()) { 
+    fprintf(stderr,"[ERROR] during opening file `%s`\n", 
+        current_wf_bin_file_name.c_str()); 
+  }
   long file_size;
   fh.seekg(0, fh.end);
   file_size = fh.tellg();
   fh.seekg(0, fh.beg);
   fh.close();
 
-  long num_of_radial_grid = file_size / sizeof(cplxd) / ell_grid_size;
+  const long num_of_radial_grid = file_size / sizeof(cplxd) / num_of_basis(qprop_dim, ell_grid_size);
+  if (num_of_radial_grid <= 0) { cerr << "[ERROR] failed to extract `num_of_radial_grid`\n"; return EXIT_FAILURE; }
+
+//  if (qprop_dim == 34) {
+//    num_of_radial_grid = file_size/sizeof(cplxd)/ell_grid_size;
+//  } else if (qprop_dim == 44) {
+//    num_of_radial_grid = file_size/sizeof(cplxd)/ell_grid_size/ell_grid_size;
+//  } else {
+//    std::cerr << "Unexpected qprop_dim: " << qprop_dim << std::endl;
+//    return 1;
+//  }
 
 //  const double R_max=para_prop.getDouble("R-max");
 //  const double R_max=para_prop.getDouble("R-max");
@@ -108,6 +120,11 @@ int main(int argc, char **argv) {
   // this is the grid on which the wavefunction is analyzed
   // delt_r must be the same for g and g_load
   // increasing ngps_x improves the resolution in the continuum 
+  if (num_of_radial_grid > para_winop.getLong("winop-radial-grid-size")) {
+    cerr << "[ERROR] The winop radial grid size " 
+      << "should not be smaller than that of propagation grid\n";
+    return 1;
+  }
   g.set_dim(qprop_dim);
   g.set_ngps(para_winop.getLong("winop-radial-grid-size"), ell_grid_size, 1); 
   g.set_delt(delta_r);
@@ -135,7 +152,9 @@ int main(int argc, char **argv) {
   const double nuclear_charge=para_ini.getDouble("nuclear-charge");
   scalarpot scalarpotx(nuclear_charge, para_ini.getDouble("pot-cutoff"));
   hamop hamilton;
-  hamilton.init(g, always_zero2, always_zero2, always_zero2, scalarpotx, always_zero5, always_zero5, always_zero_imag, always_zero2);
+  hamilton.init(
+      g, always_zero2, always_zero2, always_zero2, scalarpotx, 
+      always_zero5, always_zero5, always_zero_imag, always_zero2);
 
   // *** the wavefunction arrays
   wavefunction  wf, wf_load;
@@ -146,16 +165,27 @@ int main(int argc, char **argv) {
   wavefunction ylm_array;
   ylm_array.init(g_angle.size());
   // Function: double gsl_sf_legendre_sphPlm (int l, int m, double x)
-  // These routines compute the normalized associated Legendre polynomial \sqrt{(2l+1)/(4\pi)} \sqrt{(l-m)!/(l+m)!} P_l^m(x) suitable for use in spherical harmonics. The parameters must satisfy m >= 0, l >= m, |x| <= 1. Theses routines avoid the overflows that occur for the standard normalization of P_l^m(x)
+  // These routines compute the normalized associated Legendre polynomial 
+  // \sqrt{(2l+1)/(4\pi)} \sqrt{(l-m)!/(l+m)!} P_l^m(x) 
+  // suitable for use in spherical harmonics. 
+  // The parameters must satisfy m >= 0, l >= m, |x| <= 1. 
+  // Theses routines avoid the overflows 
+  // that occur for the standard normalization of P_l^m(x)
   if (g.dimens()==34) {
     for (long l_index=my_m_quantum_num; l_index<g_angle.ngps_y(); l_index++) {      
       for (long ltheta=0; ltheta<num_theta; ltheta++) {
 	for (long lphi=0; lphi<num_phi; lphi++) {
 	  const long ylm_index=g_angle.rlmindex(ltheta+lphi*num_theta, l_index, 0);
-	  if (my_m_quantum_num>=0)
-	    ylm_array[ylm_index]=gsl_sf_legendre_sphPlm (l_index, my_m_quantum_num, cos_theta[ltheta])*exp(cplxd(0.0, double(my_m_quantum_num)*phi[lphi]));
-	  else
-	    ylm_array[ylm_index]=((my_m_quantum_num%2==0)?1.0:-1.0)*gsl_sf_legendre_sphPlm (l_index, labs(my_m_quantum_num), cos_theta[ltheta])*exp(cplxd(0.0, double(my_m_quantum_num)*phi[lphi]));
+	  if (my_m_quantum_num>=0) {
+	    ylm_array[ylm_index] = gsl_sf_legendre_sphPlm(
+          l_index, my_m_quantum_num, 
+          cos_theta[ltheta])*exp(cplxd(0.0,double(my_m_quantum_num)*phi[lphi]));
+    } else {
+	    ylm_array[ylm_index] = ((my_m_quantum_num%2==0)?1.0:-1.0)
+        * gsl_sf_legendre_sphPlm(
+            l_index, labs(my_m_quantum_num), 
+            cos_theta[ltheta])*exp(cplxd(0.0,double(my_m_quantum_num)*phi[lphi]));
+    }
 	};
       };
     };
@@ -168,9 +198,13 @@ int main(int argc, char **argv) {
 	  for (long lphi=0; lphi<num_phi; lphi++) {
 	    const long ylm_index=g_angle.rlmindex(ltheta+lphi*num_theta, l_index, m_index);
 	    if (m_index>=0)
-	      ylm_array[ylm_index]=gsl_sf_legendre_sphPlm (l_index, m_index, cos_theta[ltheta])*exp(cplxd(0.0, double(m_index)*phi[lphi]));
+	      ylm_array[ylm_index] = gsl_sf_legendre_sphPlm(
+            l_index, m_index, 
+            cos_theta[ltheta])*exp(cplxd(0.0, double(m_index)*phi[lphi]));
 	    else
-	      ylm_array[ylm_index]=((m_index%2==0)?1.0:-1.0)*gsl_sf_legendre_sphPlm (l_index, labs(m_index), cos_theta[ltheta])*exp(cplxd(0.0, double(m_index)*phi[lphi]));
+	      ylm_array[ylm_index] = ((m_index%2==0)?1.0:-1.0)
+          * gsl_sf_legendre_sphPlm (l_index, labs(m_index), 
+              cos_theta[ltheta])*exp(cplxd(0.0, double(m_index)*phi[lphi]));
 	  };
 	};
       };
@@ -178,7 +212,13 @@ int main(int argc, char **argv) {
   };
   
   if (iv==1) cout << "Reading ... " << endl;
-
+  
+  //
+  // specify where the wavefunction (to be analyzed) is located
+  //
+  string str_fname_wf=string("real-prop-wf.dat");
+//  string str_fname_wf=string("hydrogen_re-wf.dat");
+  FILE* file_wf=fopen_with_check(str_fname_wf, "r");
   wf_load.init(g_load, file_wf, lnoofwfoutput, iv);
   fclose(file_wf);
 
@@ -199,15 +239,23 @@ int main(int argc, char **argv) {
     fflush(stdout);
   };
 
+
+  cout << "1\n";
+
   wavefunction staticpot;
   staticpot.init(g.size());
   staticpot.calculate_staticpot(g, hamilton);
+
+  cout << "2\n";
   
   // output files
   ofstream file_res(string("spectrum_")+to_string(my_m_quantum_num)+string(".dat"));
   file_res.precision(15);
   ofstream file_spectrum_polar(string("spectrum_polar")+to_string(my_m_quantum_num)+string(".dat"));
   file_spectrum_polar.precision(17);
+
+
+  cout << "3\n";
 
   // *********************************
   // *** run over the energies
@@ -216,8 +264,12 @@ int main(int argc, char **argv) {
     const double energy=energy_min+lenergy*delta_energy;
     file_res << energy << " " << sqrt(2.0*energy) << " " ;
 
+  cout << "3.1\n";
+
     cplxd result_tot(0.0, 0.0);
     winop_fullchi(fullchi, result_lsub, &result_tot, energy, gamma, staticpot, V_ee_0, nuclear_charge, g, wf, iv);
+
+  cout << "3.2\n";
 
     // write the partial results (i.e., for individual l (and m)) to file
     for(long l_index=0; l_index<g.ngps_y(); l_index++) {
@@ -287,6 +339,8 @@ int main(int argc, char **argv) {
     file_spectrum_polar << endl;
     file_res << endl;
   }; // end of energy loop
+
+  cout << "4\n";
 
   if (iv==1) cout << "Hasta la vista... " << endl;
   return 0;

@@ -216,11 +216,34 @@ int main(int argc, char **argv) {
   //
   // specify where the wavefunction (to be analyzed) is located
   //
-  string str_fname_wf=string("real-prop-wf.dat");
-//  string str_fname_wf=string("hydrogen_re-wf.dat");
-  FILE* file_wf=fopen_with_check(str_fname_wf, "r");
-  wf_load.init(g_load, file_wf, lnoofwfoutput, iv);
-  fclose(file_wf);
+  
+  string str_fname_wf;
+
+  try { str_fname_wf = para_winop.getString("input-wf-file"); }
+  catch (std::exception&) { str_fname_wf = string("real-prop-wf.dat"); }
+
+  cout << "[ LOG ] Given input wavefunction file name: "<< str_fname_wf<< endl;
+  
+  if (str_fname_wf.compare("real-prop-wf.dat") == 0) {
+  //  string str_fname_wf=string("hydrogen_re-wf.dat");
+    FILE* file_wf=fopen_with_check(str_fname_wf, "r");
+    wf_load.init(g_load, file_wf, lnoofwfoutput, iv);
+    fclose(file_wf);
+  } else if (str_fname_wf.compare("current-wf.bin") == 0) {
+    std::ifstream ifs_wf(str_fname_wf.c_str(), std::ifstream::binary);
+    if (! ifs_wf.good()) { 
+      cerr << "[ERROR] Failed to open input wf file.\n";
+      return EXIT_FAILURE; 
+    }
+    if (wf_load.load_from_binary(ifs_wf) != 0) {
+      cerr << "[ERROR] Failed to load wf from file: " << str_fname_wf << endl;
+      return EXIT_FAILURE;
+    }
+    ifs_wf.close();
+  } else {
+    cerr << "[ERROR] Unsupported input wavefunction file name.\n";
+    return EXIT_FAILURE;
+  }
 
   if (iv==1) cout << "... done." << endl;
   

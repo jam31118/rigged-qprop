@@ -36,6 +36,11 @@ BASE_FLAGS = [
     '-lmpi',
     '-lmpi_cxx',
 
+    '-I{}/gsl/include'.format(environ['QPROP_DEP_DIR']),
+    '-L{}/gsl/lib'.format(environ['QPROP_DEP_DIR']),
+    '-lgsl',
+    '-lgslcblas',
+
     # QPROP flags
     '-L{}/lib/x86_64'.format(environ['QPROP_HOME']),
     '-I{}/src/base'.format(environ['QPROP_HOME']),

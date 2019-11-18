@@ -263,13 +263,11 @@ int main(int argc, char **argv) {
   };
 
 
-  cout << "1\n";
 
   wavefunction staticpot;
   staticpot.init(g.size());
   staticpot.calculate_staticpot(g, hamilton);
 
-  cout << "2\n";
   
   // output files
   ofstream file_res(string("spectrum_")+to_string(my_m_quantum_num)+string(".dat"));
@@ -278,7 +276,6 @@ int main(int argc, char **argv) {
   file_spectrum_polar.precision(17);
 
 
-  cout << "3\n";
 
   // *********************************
   // *** run over the energies
@@ -287,12 +284,10 @@ int main(int argc, char **argv) {
     const double energy=energy_min+lenergy*delta_energy;
     file_res << energy << " " << sqrt(2.0*energy) << " " ;
 
-  cout << "3.1\n";
 
     cplxd result_tot(0.0, 0.0);
     winop_fullchi(fullchi, result_lsub, &result_tot, energy, gamma, staticpot, V_ee_0, nuclear_charge, g, wf, iv);
 
-  cout << "3.2\n";
 
     // write the partial results (i.e., for individual l (and m)) to file
     for(long l_index=0; l_index<g.ngps_y(); l_index++) {
@@ -363,7 +358,6 @@ int main(int argc, char **argv) {
     file_res << endl;
   }; // end of energy loop
 
-  cout << "4\n";
 
   if (iv==1) cout << "Hasta la vista... " << endl;
   return 0;

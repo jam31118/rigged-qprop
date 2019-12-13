@@ -188,7 +188,7 @@ void wavefunction::init(grid g, int inittype, double w, fluid &ells)
 */
 
 
-void wavefunction::init_rlm(grid g, int inittype, double w, fluid &ells, fluid &ms)
+void wavefunction::init_rlm(grid g, int inittype, double w, fluid &ells, fluid &ms, bool dual_m)
 {
   long xindex, yindex, zindex, index_i,index,i,m;
   double x,y,z;
@@ -196,7 +196,6 @@ void wavefunction::init_rlm(grid g, int inittype, double w, fluid &ells, fluid &
   double realpart, imagpart;
   long ctrl_id;
 
-  zindex=0;  
   srand((int)(w)+1);
 
   if (g.dimens() != 44 )   
@@ -204,45 +203,67 @@ void wavefunction::init_rlm(grid g, int inittype, double w, fluid &ells, fluid &
       fprintf(stderr, "init_rlm: you are not in rlm-mode!\n");
       exit(-50);
     };
-  
-  for (xindex=0; xindex<g.ngps_x(); xindex++)
+  if (dual_m) {
+    for (xindex=0; xindex<g.ngps_x(); xindex++) {
+      x=g.r(xindex);
+      for (yindex=0; yindex<g.ngps_y(); yindex++) {
+        for (m=-yindex; m<=yindex; m++) {
+          index=g.rlmindex(xindex,yindex,m);
+          switch (inittype) {
+            case 1 :
+              // ells[zindex] --> ells[0]
+              if ((yindex==(int)(ells[0])) && (m==(int)(ms[0]) || m==(int)(ms[1])))
+              {
+                start[index]=cplxd(10.0*rand()/(RAND_MAX+1.0)-0.5,0.0);
+              } else { start[index]=cplxd(0.0,0.0); }
+              break;
+            case 2 :
+              if ((yindex==(int)(ells[0])) && (m==(int)(ms[0]) || m==(int)(ms[1])))
+              {
+                start[index]=g.r(xindex)*exp(-g.r(xindex));
+              } else { start[index]=cplxd(0.0,0.0); }
+              break;
+            default :
+              start[index]=cplxd(0.0,0.0);
+          };
+        };
+      };
+    };
+  } else {
+    zindex=0;
+    for (xindex=0; xindex<g.ngps_x(); xindex++)
     { 
       x=g.r(xindex);
       for (yindex=0; yindex<g.ngps_y(); yindex++)
-	{
-	  for (m=-yindex; m<=yindex; m++)
-	    {
-	      index=g.rlmindex(xindex,yindex,m);
-	      switch (inittype)
-		{
-		case 1 :
-		  if ((yindex==(int)(ells[zindex])) && (m==(int)(ms[zindex])))
-		    {
-		      start[index]=cplxd(10.0*rand()/(RAND_MAX+1.0)-0.5,0.0);
-		    }
-		  else
-		    {
-		      start[index]=cplxd(0.0,0.0);
-		    }
-		  break;
-		case 2 :
-		  if ((yindex==(int)(ells[zindex])) && (m==(int)(ms[zindex])))
-		    {
-		      start[index]=g.r(xindex)*exp(-g.r(xindex));
-		    }
-		  else
-		    {
-		      start[index]=cplxd(0.0,0.0); 
-		    };
-		  break;
-		default :
-		  start[index]=cplxd(0.0,0.0);
-		};
-	    };
-	};
-      
+      {
+        for (m=-yindex; m<=yindex; m++)
+        {
+          index=g.rlmindex(xindex,yindex,m);
+          switch (inittype)
+          {
+            case 1 :
+              if ((yindex==(int)(ells[zindex])) && (m==(int)(ms[zindex])))
+              {
+                start[index]=cplxd(10.0*rand()/(RAND_MAX+1.0)-0.5,0.0);
+              } else {
+                start[index]=cplxd(0.0,0.0);
+              }
+              break;
+            case 2 :
+              if ((yindex==(int)(ells[zindex])) && (m==(int)(ms[zindex])))
+              {
+                start[index]=g.r(xindex)*exp(-g.r(xindex));
+              } else {
+                start[index]=cplxd(0.0,0.0);
+              };
+              break;
+            default :
+              start[index]=cplxd(0.0,0.0);
+          };
+        };
+      };
     };
-      
+  }
 }
 
 

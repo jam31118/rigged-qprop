@@ -88,7 +88,7 @@ class wavefunction
 
     int init(long isize);
     void init(grid g, int inittype, double width, fluid &ells);
-    void init_rlm(grid g, int inittype, double w, fluid &ells, fluid &ms);
+    void init_rlm(grid g, int inittype, double w, fluid &ells, fluid &ms, bool dual_m = false);
     void init(grid g, int inittype, FILE* file, int ooi);
     int init(grid g, FILE* file, int ooi, int iv);
 

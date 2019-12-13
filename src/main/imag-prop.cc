@@ -23,19 +23,19 @@ bool nlm_are_consistent(long n, long ell, long m, grid g) {
   consistent &= n >= 1; // for valid n
   return consistent;
 }
-  
+
 
 int substract_component(grid g, wavefunction &wf1, wavefunction &wf2) {
   // DESCRIPTION //
   // Compute the wf2 component in wf1 
   // .. and substract it so that wf1 and wf2 are mutually orthogonal.
   // No normalization is done on the result.
-  
+
   if (wf1.wf_size() != wf1.wf_size()) {
     fprintf(stderr, "[ERROR] The sizes of two input wavefunction are different.");
     return 1;
   }
-  
+
   cplxd component_of_wf2_in_wf1 = wf1 * wf2 * g.delt_x();
   wf1 = wf1 - component_of_wf2_in_wf1 * wf2;
 
@@ -45,7 +45,7 @@ int substract_component(grid g, wavefunction &wf1, wavefunction &wf2) {
 // all wf in wf_arr should be initialized with size of g
 int get_n_th_eigenstate(long n, const long my_ell_quantum_num, wavefunction *wf_arr, const cplxd timestep, 
     const long lno_of_ts, grid& g, hamop& hamilton, const int me, 
-    wavefunction& staticpot, scalarpot& scalarpotx, const long my_m_quantum_num,
+    wavefunction& staticpot, scalarpot& scalarpotx, const long my_m_quantum_num, const bool dual_m,
     FILE *file_obser_imag, int iv, double *acc_in, double *E_tot_in, const double acc_tol, int iinitmode) {
 
   cout << "[ LOG ] entered get-n-th with n: "<< n << endl;
@@ -53,7 +53,7 @@ int get_n_th_eigenstate(long n, const long my_ell_quantum_num, wavefunction *wf_
   if ( n == my_ell_quantum_num+1 ) {} // just pass
   else if ( n > my_ell_quantum_num+1 ) {
     if (get_n_th_eigenstate(n-1, my_ell_quantum_num, wf_arr, timestep, lno_of_ts, g, hamilton, 
-          me, staticpot, scalarpotx, my_m_quantum_num, file_obser_imag, iv, acc_in, E_tot_in, acc_tol, iinitmode) != 0) {
+        me, staticpot, scalarpotx, my_m_quantum_num, dual_m, file_obser_imag, iv, acc_in, E_tot_in, acc_tol, iinitmode) != 0) {
       std::cerr << "[ERROR] Failed to get " << n-1 << "-th eigenstate\n";
       return 1;
     }
@@ -67,10 +67,15 @@ int get_n_th_eigenstate(long n, const long my_ell_quantum_num, wavefunction *wf_
 //  int iinitmode = 2;
   fluid ell_init, m_init;
   ell_init[0] = my_ell_quantum_num;
-  m_init[0] = my_m_quantum_num;
+  if (dual_m) {
+    m_init[0] = -1;
+    m_init[1] = 1;
+  } else {
+    m_init[0] = my_m_quantum_num;
+  }
   (*p_wf).init(g.size());
   if (g.dimens()==34) { (*p_wf).init(g, iinitmode, 1.0, ell_init); } 
-  else if (g.dimens() == 44) { (*p_wf).init_rlm(g, iinitmode, 1.0, ell_init, m_init); }
+  else if (g.dimens() == 44) { (*p_wf).init_rlm(g, iinitmode, 1.0, ell_init, m_init, dual_m); }
   else { 
     std::cerr << "[ERROR] Unexpected propagation mode: " << g.dimens() << endl;
     return 1;
@@ -141,7 +146,7 @@ int imag_prop(int argc, char **argv) {
 
   parameterListe para_ini("initial.param");
   parameterListe default_param = get_default_parameter_list_object(); 
-  
+
 //  double alpha;
 //  try { alpha = para_ini.getDouble("effpot-alpha"); }
 //  catch (std::exception&) { alpha = 0.0; } // default value - if alpha = 0.0 means no effective potential but just become coulumb potential.
@@ -149,22 +154,32 @@ int imag_prop(int argc, char **argv) {
   scalarpot scalarpotx(para_ini.getDouble("nuclear-charge"), para_ini.getDouble("pot-cutoff"), get_effpot_alpha(para_ini));
   if ( print_scalarpot(-1, NULL) != 0) { fprintf(stderr, "[ERROR] Failed to print scalarpot\n"); };
 // scalarpot scalarpotx(para_ini.getDouble("nuclear-charge"), para_ini.getDouble("pot-cutoff"));
-  
+
   //
   // input
   //
+
+  //// Get and set dual-m configuation
+  bool dual_m = false;
+  try { dual_m = para_ini.getBool("dual-m"); }
+  catch (std::exception&) {}
+
   // *** declare the grid ***
   g.set_dim(para_ini.getLong("qprop-dim")); // 44 elliptical polariz., 34 linear polariz.
   const double delta_r = para_ini.getDouble("delta-r");
   double grid_radial_size = para_ini.getDouble("radial-grid-size");
-  g.set_ngps(long(grid_radial_size/delta_r), para_ini.getLong("ell-grid-size"), 1);  // <--------------------------------- max. Anzahl in r-Richtung, in ell-Richtung, immer 1
+  if (dual_m) {
+    g.set_ngps(long(grid_radial_size/delta_r), para_ini.getLong("ell-grid-size"), 2);
+  } else {
+    g.set_ngps(long(grid_radial_size/delta_r), para_ini.getLong("ell-grid-size"), 1);  // <--------------------------------- max. Anzahl in r-Richtung, in ell-Richtung, immer 1
+  }
   g.set_delt(delta_r);  // <-------------------------------- delta r
   g.set_offs(0, 0, 0);
 
   int iinitmode = 2; // 1 -- random, 2 -- hydrogenic wf.
 
   int iv        = 1; // verbosity of stdout
-     
+
   //
   // prepare for propagation ...
   // 
@@ -180,7 +195,7 @@ int imag_prop(int argc, char **argv) {
   fluid ell_init, m_init;
   ell_init.init(g.ngps_z());
   m_init.init(g.ngps_z());
-  
+
   const long my_m_quantum_num=para_ini.getLong("initial-m");
   const long my_ell_quantum_num=para_ini.getLong("initial-ell");
   ell_m_consistency(my_ell_quantum_num, my_m_quantum_num, g);
@@ -188,7 +203,7 @@ int imag_prop(int argc, char **argv) {
   try { initial_n = para_ini.getLong("initial-n"); }
   catch (std::exception&) { initial_n = my_ell_quantum_num + 1; } // default value
   if ( initial_n < 1 ) { std::cerr << "[ERROR] 'initial-n' must be equal or bigger than 1\n"; }
-  
+
   if ( ! nlm_are_consistent(initial_n, my_ell_quantum_num, my_m_quantum_num, g) ) {
     std::cerr << "[ERROR] nlm are not consistent\n";
     std::cerr << "[ LOG ] n: " << initial_n << " ell: " << my_ell_quantum_num << " m: " << my_m_quantum_num << endl;
@@ -196,7 +211,14 @@ int imag_prop(int argc, char **argv) {
   }
 
   ell_init[0] = my_ell_quantum_num; // populated l quantum number (needed for initialization only)  <---------------------------- 1s, 2p, 3d, ?????
-  m_init[0] = my_m_quantum_num;     // populated m quantum number (needed for initialization only)
+  if (dual_m) {
+    // dual m, p- and p+
+    m_init[0] = -1;
+    m_init[1] = 1;
+  } else {
+    m_init[0] = my_m_quantum_num;
+    // populated m quantum number (needed for initialization only)
+  }
   const int me = 0; // dummy here
 
   E_i.init(g.ngps_z());
@@ -207,7 +229,7 @@ int imag_prop(int argc, char **argv) {
   // the Hamiltonian
   imagpot imaginarypot(0, 0.0);
   hamilton.init(g, always_zero2, always_zero2, always_zero2, scalarpotx, always_zero5, always_zero5, imaginarypot, always_zero2);
-  
+
   // this is the linear and constant part of the Hamiltonian
   staticpot.init(g.size()); 
   staticpot.calculate_staticpot(g, hamilton);
@@ -233,18 +255,18 @@ int imag_prop(int argc, char **argv) {
 	  <<  str_fname_obser  << " will be (re)written." << endl
 	  <<  str_fname_wf_fin  << " will be (re)written." << endl;
   };
-  
+
   // *** new initialization ***
   // *** the wavefunction array 
   wf.init(g.size()); 
   if (g.dimens()==34) { wf.init(g, iinitmode, 1.0, ell_init); } 
-  else if (g.dimens() == 44) { wf.init_rlm(g, iinitmode, 1.0, ell_init, m_init); }
+  else if (g.dimens() == 44) { wf.init_rlm(g, iinitmode, 1.0, ell_init, m_init, dual_m); }
   else { std::cerr << "[ERROR] Unexpected propagation mode: " << g.dimens() << endl; }
-  
+
   wf.normalize(g);
 
   fprintf(stdout, "Norm of KS-orbital: %le\n", wf.norm(g));
-  
+
   //
   // write in log file
   //
@@ -255,6 +277,9 @@ int imag_prop(int argc, char **argv) {
   fprintf(file_logfi,"g.ngps_z() = %ld\n", g.ngps_z());
   fprintf(file_logfi,"g.dimens() = %d\n\n", g.dimens());
   fprintf(file_logfi,"g.delt_x() = %20.15le\n", g.delt_x());
+
+  fprintf(file_logfi,"dual-m = %d\n", dual_m);
+  fprintf(file_logfi,"m_init.size = %d\n", m_init.wf_size());
 
   fprintf(file_logfi,"imag_timestep     = %20.15le\n", imag_timestep);
   fprintf(file_logfi,"lno_of_ts         = %ld\n", lno_of_ts);
@@ -277,14 +302,14 @@ int imag_prop(int argc, char **argv) {
 
   double E_tot = 0.0;
   const cplxd timestep(0.0, -1.0*imag_timestep);
-  
+
   wavefunction *wf_arr = new wavefunction[initial_n-my_ell_quantum_num];
   wavefunction *p_wf;
   for (long wf_index = 0; wf_index < initial_n-my_ell_quantum_num; wf_index++) {
     p_wf = &wf_arr[wf_index];
     (*p_wf).init(g.size());
     if (g.dimens()==34) { (*p_wf).init(g, iinitmode, 1.0, ell_init); } 
-    else if (g.dimens() == 44) { (*p_wf).init_rlm(g, iinitmode, 1.0, ell_init, m_init); }
+    else if (g.dimens() == 44) { (*p_wf).init_rlm(g, iinitmode, 1.0, ell_init, m_init, dual_m); }
     else { std::cerr << "[ERROR] Unexpected propagation mode: " << g.dimens() << endl; }
     (*p_wf).normalize(g);
   }
@@ -292,7 +317,7 @@ int imag_prop(int argc, char **argv) {
   cout << "[ LOG ] right before get-n-th ... \n";
 
   if (get_n_th_eigenstate(initial_n, my_ell_quantum_num, wf_arr, timestep, lno_of_ts, g, hamilton, 
-          me, staticpot, scalarpotx, my_m_quantum_num, file_obser_imag, iv, &acc, &E_tot, acc_tol, iinitmode) != 0) {
+          me, staticpot, scalarpotx, my_m_quantum_num, dual_m, file_obser_imag, iv, &acc, &E_tot, acc_tol, iinitmode) != 0) {
     std::cerr << "[ERROR] Failed to get " << initial_n-1 << "-th eigenstate\n";
     return 1;
   }
@@ -325,7 +350,7 @@ int imag_prop(int argc, char **argv) {
 //    wf.normalize(g);
 //
 //  };
- 
+
   fprintf(file_logfi, "acc = %le\n", acc);
 
   fclose(file_obser_imag);
@@ -367,7 +392,11 @@ int imag_prop(int argc, char **argv) {
 //  cout << "add_quiver_ampl: " << add_quiver_ampl << endl;
 //  if (add_quiver_ampl) { grid_size += quiver_amplitude; }
   //
-  g_prop.set_ngps(long(grid_size/delta_r), para_prop.getLong("ell-grid-size"), 1); 
+  if (dual_m) {
+    g_prop.set_ngps(long(grid_size/delta_r), para_prop.getLong("ell-grid-size"), 2);
+  } else {
+    g_prop.set_ngps(long(grid_size/delta_r), para_prop.getLong("ell-grid-size"), 1);
+  }
   g_prop.set_delt(delta_r);
   g_prop.set_offs(0, 0, 0);
 

@@ -21,17 +21,20 @@ class vecpot {
   double duration;
   double ww;
   double start_time, end_time;
+  double delay;
 public:
   vecpot() { duration = -1; };
-  vecpot(double om, double n_cyc, double E_max, double cep, double start_time_in = 0.0) : omega(om), n_c(n_cyc), E_0(E_max), phi_cep(cep), start_time(start_time_in) {
+  vecpot(double om, double n_cyc, double E_max, double cep, double start_time_in = 0.0, double my_delay = 0.0) : omega(om), n_c(n_cyc), E_0(E_max), phi_cep(cep), delay(my_delay), start_time(start_time_in) {
     duration=n_c*2*M_PI/omega;
     // angular frequency of the envelope
     ww=omega/(2.0*n_c);
-    end_time = start_time + duration;
+    end_time = delay + start_time + duration;
   };
   double operator()(double time, int me) const {
     // switch of the field for propagation after the pulse
-    if ((time>0.0) && (time<duration)) {
+    if (time<delay) { return 0; }   // add delay
+    else if ((time>=delay) && (time<duration + delay)) {
+      time = time - delay;
       return E_0/omega*pow2(sin(ww*time))*sin(omega*time+phi_cep); // here's the shape of the laser pulse
     }
     else {
@@ -44,6 +47,7 @@ public:
   double get_phase() { return phi_cep; }
   double get_start_time() { return start_time; }
   double get_end_time() { return end_time; }
+  double get_delay() { return delay; }
   double get_duration() {
     return duration;
   };
@@ -63,7 +67,9 @@ public:
     const double cos_phi_2 = pow2(cos(phi_cep));
     const double phi = phi_cep;
     const double ampl = E_0/omega;
-    if (Time<pulse_dur) {
+    if (Time<delay) { return 0.0; }    // add delay
+    else if ((Time>=delay) && (Time<pulse_dur + delay)) {
+      Time = Time - delay;
       return ampl*((omega_2*sin(phi)*pulse_dur_2-2.0*omega*sin(phi)*pi*pulse_dur)*sin(((omega*pulse_dur+2.0*pi)*Time+2.0*phi*pulse_dur)/pulse_dur)
 		   +(omega_2*cos(phi)*pulse_dur_2-2.0*omega*cos(phi)*pi*pulse_dur)*cos(((omega*pulse_dur+2.0*pi)*Time+2.0*phi*pulse_dur)/pulse_dur)
 		   +(omega_2*sin(phi)*pulse_dur_2+2.0*omega*sin(phi)*pi*pulse_dur)*sin(((omega*pulse_dur-2.0*pi)*Time+2.0*phi*pulse_dur)/pulse_dur)
@@ -138,11 +144,17 @@ class scalarpot {
   double get_nuclear_charge() { return nuclear_charge; };
 
   double operator () (double x, double y, double z, double time, int me) const {
-		double Z = nuclear_charge;
+    double Z = nuclear_charge;
     double result = 0;
-		double result0 = - (1 + exp(-alpha*R_co) * (Z - 1)) / R_co;
+    //// 原始
+    double result0 = - (1 + exp(-alpha*R_co) * (Z - 1)) / R_co;
+    //// xe
+    //double result0 = -(1 + 6 * exp(-0.722 * pow(R_co,double(1.8)))) / sqrt(R_co*R_co + 1.218);
     if (x < R_co) {
-			result = - (1 + exp(-alpha*x) * (Z - 1)) / x;
+      //// 原始
+      result = - (1 + exp(-alpha*x) * (Z - 1)) / x;
+      //// xe
+      //result = -(1 + 6 * exp(-0.722 * pow(x, double(1.8)))) / sqrt(x*x + 1.218);
     } else if (x < 2*R_co) {
       result = - (x - R_co) / (R_co)*result0 + result0;
     } else {

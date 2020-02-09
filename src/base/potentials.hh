@@ -14,30 +14,41 @@ double always_zero_imag(long x, long y, long z, double t, grid g);
 
 // The vector potential with sine squared envelope
 class vecpot {
-  double omega;
-  double n_c;
-  double E_0;
-  double phi_cep;
-  double duration;
-  double ww;
+
+  double omega;  // angular freqency
+  double n_c;  // number of cycles
+  double E_0;  // max electric field amplitude
+  double phi_cep;  // carrier-envelop-phase (CEP)
+  double duration;  // duration of pulse
+  double ww;  // angular frequency of the envelope
   double start_time, end_time;
+
 public:
+
   vecpot() { duration = -1; };
-  vecpot(double om, double n_cyc, double E_max, double cep, double start_time_in = 0.0) : omega(om), n_c(n_cyc), E_0(E_max), phi_cep(cep), start_time(start_time_in) {
-    duration=n_c*2*M_PI/omega;
+
+  vecpot(
+      double om, double n_cyc, double E_max, double cep, 
+      double start_time_in = 0.0) : 
+    omega(om), n_c(n_cyc), E_0(E_max), phi_cep(cep), start_time(start_time_in) 
+  {
+    duration = n_c * 2*M_PI/omega;
     // angular frequency of the envelope
     ww=omega/(2.0*n_c);
     end_time = start_time + duration;
   };
+
   double operator()(double time, int me) const {
     // switch of the field for propagation after the pulse
-    if ((time>0.0) && (time<duration)) {
-      return E_0/omega*pow2(sin(ww*time))*sin(omega*time+phi_cep); // here's the shape of the laser pulse
+    if ((time>start_time) && (time<end_time)) {
+      // here's the shape of the laser pulse
+      return E_0/omega*pow2(sin(ww*(time-start_time)))*sin(omega*(time-start_time)+phi_cep); 
     }
     else {
-      return 0;
+      return 0.0;
     };
   };
+
   double get_omega() { return omega; }
   double get_E0() { return E_0; }
   double get_num_cycles() { return n_c; }
@@ -50,7 +61,7 @@ public:
   double get_Up() {
     return (E_0 * E_0)/4.0/(omega*omega);
   };
-  double integral(double Time) {
+  double integral(double absolute_time) {
     // grind(ratsimp(integrate(sin(pi*time/pulse_dur)**2*sin(omega*time+phi), time, 0, Time)));
     // const double omega = omega;
     const double omega_2 = pow2(omega);
@@ -63,7 +74,12 @@ public:
     const double cos_phi_2 = pow2(cos(phi_cep));
     const double phi = phi_cep;
     const double ampl = E_0/omega;
-    if (Time<pulse_dur) {
+
+    double Time = absolute_time - start_time;
+
+    if (Time < 0.0) { 
+      return 0.0; 
+    } else if (Time < duration) {
       return ampl*((omega_2*sin(phi)*pulse_dur_2-2.0*omega*sin(phi)*pi*pulse_dur)*sin(((omega*pulse_dur+2.0*pi)*Time+2.0*phi*pulse_dur)/pulse_dur)
 		   +(omega_2*cos(phi)*pulse_dur_2-2.0*omega*cos(phi)*pi*pulse_dur)*cos(((omega*pulse_dur+2.0*pi)*Time+2.0*phi*pulse_dur)/pulse_dur)
 		   +(omega_2*sin(phi)*pulse_dur_2+2.0*omega*sin(phi)*pi*pulse_dur)*sin(((omega*pulse_dur-2.0*pi)*Time+2.0*phi*pulse_dur)/pulse_dur)
@@ -78,8 +94,7 @@ public:
 		   +(8.0*cos(phi)*pi_2-2.0*omega_2*cos(phi)*pulse_dur_2)*cos(omega*Time)
 		   +(-8.0*sin(phi)*sin(2.0*phi)-8.0*cos(phi)*cos(2.0*phi)-8.0*cos(phi))*pi_2)
 	/((8.0*omega_3*sin_phi_2+8.0*omega_3*cos_phi_2)*pulse_dur_2+(-32.0*omega*sin_phi_2-32.0*omega*cos_phi_2)*pi_2);
-    }
-    else {
+    } else {
       return ampl*((omega_2*sin(phi)*pulse_dur_2-2.0*omega*sin(phi)*pi*pulse_dur)*sin(((omega*pulse_dur+2.0*pi)*pulse_dur+2.0*phi*pulse_dur)/pulse_dur)
 		   +(omega_2*cos(phi)*pulse_dur_2-2.0*omega*cos(phi)*pi*pulse_dur)*cos(((omega*pulse_dur+2.0*pi)*pulse_dur+2.0*phi*pulse_dur)/pulse_dur)
 		   +(omega_2*sin(phi)*pulse_dur_2+2.0*omega*sin(phi)*pi*pulse_dur)*sin(((omega*pulse_dur-2.0*pi)*pulse_dur+2.0*phi*pulse_dur)/pulse_dur)
@@ -223,7 +238,12 @@ class superposed_vecpot {
     double min_start_time = vp.get_start_time();
     for (vecpot_index = 1; vecpot_index < num_of_vecpot; vecpot_index++) {
       vp = vecpot_arr[vecpot_index];
-      if (min_start_time > vp.get_start_time()) { min_start_time = vp.get_start_time(); }
+
+//      cout << "[ LOG ][0] vp.start_time = " << vp.get_start_time() << std::endl;
+
+      if (min_start_time > vp.get_start_time()) { 
+        min_start_time = vp.get_start_time(); 
+      }
     }
     return min_start_time;
   }
@@ -234,7 +254,9 @@ class superposed_vecpot {
     double max_end_time = vp.get_end_time();
     for (vecpot_index = 1; vecpot_index < num_of_vecpot; vecpot_index++) {
       vp = vecpot_arr[vecpot_index];
-      if (max_end_time < vp.get_end_time()) { max_end_time = vp.get_end_time(); }
+      if (max_end_time < vp.get_end_time()) { 
+        max_end_time = vp.get_end_time(); 
+      }
     }
     return max_end_time;
   }

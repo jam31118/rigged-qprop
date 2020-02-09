@@ -12,7 +12,16 @@
 
 
 struct vecpot_param {
-  double omega, E0, num_cycles, phase_pi;
+  double omega, E0, num_cycles, phase_pi, start_time;
+
+  vecpot_param(): start_time(0.0) {};
+
+  vecpot_param(
+      double omega_in, double E0_in, double num_cycles_in, double phase_pi_in, 
+      double start_time_in=0.0):
+    omega(omega_in), num_cycles(num_cycles_in), phase_pi(phase_pi_in),
+    start_time(start_time_in) {};
+
 };
 
 const char valid_directions[] = "xyz";

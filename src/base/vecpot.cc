@@ -6,7 +6,7 @@ using std::cout;
 
 bool is_valid_direction(char direction) {
     int char_index, num_of_matches = 0;
-    for (char_index=0; char_index<strlen(valid_directions); char_index++) {
+    for (char_index=0; char_index<int(strlen(valid_directions)); char_index++) {
 	if (direction == valid_directions[char_index]) { num_of_matches++; }
     }
     if ( num_of_matches == 1 ) { return true; } // there is a single matched valid direction
@@ -22,6 +22,7 @@ void print_vecpot_param(struct vecpot_param vparam) {
     cout << "E0: " << vparam.E0 << endl;
     cout << "num-cycles: " << vparam.num_cycles << endl;
     cout << "phase / pi " << vparam.phase_pi << endl;
+    cout << "start-time " << vparam.start_time << endl;
 }
 
 bool if_exist_get_vecpot_param ( parameterListe& para_prop, char direction, 
@@ -30,7 +31,9 @@ bool if_exist_get_vecpot_param ( parameterListe& para_prop, char direction,
   if ( ! is_valid_direction(direction) ) { 
 	  fprintf(stderr, "[ LOG ] The given direction('%c') is not valid.\n", direction);
 	  fprintf(stderr, "[ LOG ] Please choose direction among the following characters: \"%s\"\n", valid_directions);
-	  throw "[ERROR] Direction is not valid!"; }
+	  throw "[ERROR] Direction is not valid!"; 
+  }
+
   // construct suffix for each parameter name in a form: '-i-j'
   string suffix = string("-") + string(1, direction)
     + string("-") + to_string((long long int) vecpot_index); // 'long long int' is for working around ambiguous to_string method due to overloading
@@ -51,6 +54,13 @@ bool if_exist_get_vecpot_param ( parameterListe& para_prop, char direction,
   } catch (std::exception&) {
     vecpot_set_exist = false;
   }
+
+  try {
+    vp->start_time = para_prop.getDouble(string("start-time")+suffix);
+  } catch (std::exception&) {
+    cout << "[ LOG ] start-time set to default value.\n";
+  }
+
   
   if (vecpot_set_exist) { print_vecpot_param(*vp); }
 
@@ -92,6 +102,9 @@ int vecpot_param_with_original_param_34 ( parameterListe& para, struct vecpot_pa
 
   try { vp->phase_pi = para.getDouble("phase") / M_PI; }
   catch (std::exception&) { vp->phase_pi = 0.0; }  // default value
+
+  try { vp->start_time = para.getDouble("start-time"); }
+  catch (std::exception&) {} // The default value is defined in the vp object
   
   return 0;
 }
@@ -106,7 +119,8 @@ int construct_vecpot_with_original_param_34 ( parameterListe& para,
 
   vecpot_x = vecpot(vp.omega, 1.0, 0.0, 0.0);
   vecpot_y = vecpot(vp.omega, 1.0, 0.0, 0.0);
-  vecpot_z = vecpot(vp.omega, vp.num_cycles, vp.E0, vp.phase_pi * M_PI);
+  vecpot_z = vecpot(vp.omega, vp.num_cycles, vp.E0, vp.phase_pi * M_PI, 
+      vp.start_time);
 
   return 0;
 }
@@ -129,7 +143,10 @@ int if_exist_get_superposed_vecpot(parameterListe& para, char direction,
         << " and index " << vecpot_index_in_param_name << endl;
       return 1;
     }
-    vp_arr[vecpot_index] = vecpot(vparam.omega, vparam.num_cycles, vparam.E0, vparam.phase_pi * M_PI);
+    // Construct vecpot object
+    vp_arr[vecpot_index] = vecpot(
+        vparam.omega, vparam.num_cycles, vparam.E0, 
+        vparam.phase_pi * M_PI, vparam.start_time);
   }
   svp = superposed_vecpot(vp_arr, num_of_vecpot);
   return 0;
@@ -142,6 +159,7 @@ void print_vecpot(vecpot& vp, const char *tag) {
   cout << "[ LOG ] - E0 = " << vp.get_E0() << endl;
   cout << "[ LOG ] - num_cycles " << vp.get_num_cycles() << endl;
   cout << "[ LOG ] - phase " << vp.get_phase() << endl;
+  cout << "[ LOG ] - start_time " << vp.get_start_time() << endl;
   cout << "[ LOG ] ---------------------------------" << endl; 
 }
 
@@ -159,6 +177,7 @@ void print_superposed_vecpot(superposed_vecpot& svp, const char *tag) {
 
 int construct_superposed_vecpot_at_direction(parameterListe& para,
     char direction, superposed_vecpot& svp) {
+
   int number_of_vecpot_param_set = get_number_of_vecpot_param_set(para, direction);
   int return_code = if_exist_get_superposed_vecpot(para, 
       direction, svp, number_of_vecpot_param_set);
@@ -172,10 +191,10 @@ int construct_superposed_vecpot_at_direction(parameterListe& para,
 }
 
 
-//int construct_vecpot ( long dim, parameterListe& para_prop, 
-//    vecpot& vecpot_x, vecpot& vecpot_y, vecpot& vecpot_z ) {
 int construct_vecpot ( long dim, parameterListe& para_prop, 
-    superposed_vecpot& vecpot_x, superposed_vecpot& vecpot_y, superposed_vecpot& vecpot_z ) {
+    superposed_vecpot& vecpot_x, superposed_vecpot& vecpot_y, 
+    superposed_vecpot& vecpot_z ) 
+{
 
   if (dim==34) {
     //char direction = 'z';
@@ -237,5 +256,7 @@ int construct_vecpot ( long dim, parameterListe& para_prop,
     std::cerr << "[ERROR] Unexpected propagation mode (dimension): "
       << dim << endl;
   }
+
+  return 0;
 }
 

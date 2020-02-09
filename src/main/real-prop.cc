@@ -81,20 +81,28 @@ int real_prop(int argc, char **argv) {
   }
 
 
-  // Determine duration of the vector potential
+  // Determine duration and start time of the total vector potential
   // [NOTE] This should be determined by qprop-dimension and combination of several vecpot
-  double pulse_duration;
+  double pulse_duration, vecpot_global_start_time;
   if ( g_prop.dimens() == 34 ) { 
-    if ( vecpot_z.get_start_time() != 0 ) { std::cerr << "[ERROR] global time should be zero\n"; }
+    vecpot_global_start_time = vecpot_z.get_start_time();
     pulse_duration = vecpot_z.get_duration(); 
   }
   else if ( g_prop.dimens() == 44 ) {
-    if ( ( vecpot_x.get_start_time() != 0 ) || ( vecpot_y.get_start_time() != 0 ) ) { 
-      std::cerr << "[ERROR] global start time should should be zero\n"; }
+    double vecpot_x_start_time = vecpot_x.get_start_time();
+    double vecpot_y_start_time = vecpot_y.get_start_time();
+    vecpot_global_start_time = vecpot_x_start_time < vecpot_y_start_time ? vecpot_x_start_time : vecpot_y_start_time;
     double pulse_duration_x = vecpot_x.get_duration();
     double pulse_duration_y = vecpot_y.get_duration();
     if ( pulse_duration_x > pulse_duration_y ) { pulse_duration = pulse_duration_x; }
     else { pulse_duration = pulse_duration_y; }
+  } else { 
+    std::cerr << "[ERROR] Unexpected qprop dimension.\n"; 
+    return EXIT_FAILURE; 
+  }
+  if ( vecpot_global_start_time != 0.0 ) { 
+    std::cerr << "[ERROR] global starting time should should be zero\n"; 
+    return EXIT_FAILURE;
   }
 
 
@@ -233,7 +241,7 @@ int real_prop(int argc, char **argv) {
   if (start_time_index == 0) {
     str_fname_vpot = common_prefix+string("-vecpot.dat");
     FILE* file_vpot = fopen_with_check(str_fname_vpot, "w");
-    double time = 0.0;
+    double time = vecpot_global_start_time;
     if (g_prop.dimens() == 34) {
       for (long ts=0; ts<lno_of_ts; ts++) {
         if (ts%ldumpwidth==0)
@@ -300,7 +308,7 @@ int real_prop(int argc, char **argv) {
     tim.restart();
 #endif
   for (long ts=start_time_index; ts < max_time_index; ts++) {
-    const double time=real_timestep*double(ts);
+    const double time= vecpot_global_start_time + real_timestep*double(ts);
     // save the orbitals \varphi_{\ell}(\RI) and the derivative \partial_r\varphi_{\ell}(r)|_{r=\RI}
     tsurff_save_wf(wf);
 
